@@ -1,0 +1,36 @@
+<div class="app-container">
+  @if (!isConnected()) {
+    <app-connection-dialog (connect)="onConnect($event)"></app-connection-dialog>
+  } @else {
+    <header class="header">
+      <div class="header-info">
+        <h1>DeepHaven Table Viewer</h1>
+        @if (connectionInfo) {
+          <span class="connection-details">
+            Connected to: {{ connectionInfo.serverUrl }} | Table: {{ connectionInfo.tableName }}
+          </span>
+        }
+      </div>
+      <button class="disconnect-btn" (click)="onDisconnect()">Disconnect</button>
+    </header>
+
+    <main class="grid-container">
+      @if (isLoading()) {
+        <div class="loading">Loading table data...</div>
+      } @else if (error()) {
+        <div class="error">{{ error() }}</div>
+      } @else {
+        <ag-grid-angular
+          [theme]="theme"
+          [rowData]="rowData()"
+          [columnDefs]="columnDefs()"
+          [defaultColDef]="defaultColDef"
+          (gridReady)="onGridReady($event)"
+          [animateRows]="true"
+          [pagination]="true"
+          [paginationPageSize]="100"
+        />
+      }
+    </main>
+  }
+</div>

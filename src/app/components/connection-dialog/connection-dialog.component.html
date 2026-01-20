@@ -1,0 +1,60 @@
+<div class="dialog-overlay">
+  <div class="dialog">
+    <h2>Connect to DeepHaven</h2>
+
+    <form (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="serverUrl">DeepHaven Server URL</label>
+        <input
+          type="text"
+          id="serverUrl"
+          [ngModel]="serverUrl()"
+          (ngModelChange)="serverUrl.set($event)"
+          name="serverUrl"
+          placeholder="http://montunoblenumbat2404:10000"
+          [disabled]="isSubmitting()"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="authToken">Auth Token (PSK)</label>
+        <input
+          type="password"
+          id="authToken"
+          [ngModel]="authToken()"
+          (ngModelChange)="authToken.set($event)"
+          name="authToken"
+          placeholder="Enter PSK token"
+          [disabled]="isSubmitting()"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="tableName">Table Name</label>
+        <input
+          type="text"
+          id="tableName"
+          [ngModel]="tableName()"
+          (ngModelChange)="tableName.set($event)"
+          name="tableName"
+          placeholder="e.g., myTable or scope/tableName"
+          [disabled]="isSubmitting()"
+        />
+      </div>
+
+      @if (errorMessage()) {
+        <div class="error-message">
+          {{ errorMessage() }}
+        </div>
+      }
+
+      <button type="submit" [disabled]="isSubmitting()">
+        @if (isSubmitting()) {
+          Connecting...
+        } @else {
+          Connect
+        }
+      </button>
+    </form>
+  </div>
+</div>

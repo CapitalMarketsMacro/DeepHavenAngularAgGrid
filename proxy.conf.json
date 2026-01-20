@@ -1,0 +1,24 @@
+{
+  "/jsapi": {
+    "target": "http://montunoblenumbat2404:10000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/ide": {
+    "target": "http://montunoblenumbat2404:10000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/arrow.flight.protocol.FlightService": {
+    "target": "http://montunoblenumbat2404:10000",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true
+  },
+  "/io.deephaven": {
+    "target": "http://montunoblenumbat2404:10000",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true
+  }
+}
