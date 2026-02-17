@@ -1,8 +1,9 @@
-import { Component, computed, inject, ViewChild } from '@angular/core';
+import { Component, computed, inject, ViewChild, OnInit, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { AgGridAngular } from 'ag-grid-angular';
-import { ColDef, GridReadyEvent, GridApi, themeQuartz, colorSchemeDarkBlue } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, GridApi, themeQuartz, colorSchemeDarkBlue, GetRowIdParams } from 'ag-grid-community';
 import { ConnectionDialogComponent } from './components/connection-dialog/connection-dialog.component';
-import { DeephavenService, ConnectionConfig } from './services/deephaven.service';
+import { DeephavenService, ConnectionConfig, TableTransaction } from './services/deephaven.service';
 
 @Component({
   selector: 'app-root',
@@ -11,11 +12,12 @@ import { DeephavenService, ConnectionConfig } from './services/deephaven.service
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
-export class App {
+export class App implements OnInit, OnDestroy {
   @ViewChild(ConnectionDialogComponent) connectionDialog!: ConnectionDialogComponent;
 
   private readonly deephavenService = inject(DeephavenService);
   private gridApi!: GridApi;
+  private transactionSubscription?: Subscription;
 
   readonly isConnected = this.deephavenService.isConnected;
   readonly isLoading = this.deephavenService.isLoading;
@@ -48,6 +50,43 @@ export class App {
   };
 
   readonly theme = themeQuartz.withPart(colorSchemeDarkBlue);
+
+  // Row ID function for ag-Grid to identify rows for updates
+  getRowId = (params: GetRowIdParams): string => {
+    const keyField = this.deephavenService.getRowKeyField();
+    if (keyField && params.data[keyField] !== undefined) {
+      return String(params.data[keyField]);
+    }
+    return String(params.data.__rowIndex);
+  };
+
+  ngOnInit(): void {
+    // Subscribe to transaction updates for incremental grid updates
+    this.transactionSubscription = this.deephavenService.transaction$.subscribe(
+      (transaction: TableTransaction) => {
+        this.applyGridTransaction(transaction);
+      }
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.transactionSubscription?.unsubscribe();
+  }
+
+  private applyGridTransaction(transaction: TableTransaction): void {
+    if (!this.gridApi) {
+      console.warn('Grid API not ready, cannot apply transaction');
+      return;
+    }
+
+    console.log('Applying grid transaction:', transaction);
+
+    this.gridApi.applyTransaction({
+      add: transaction.add,
+      update: transaction.update,
+      remove: transaction.remove
+    });
+  }
 
   onGridReady(params: GridReadyEvent): void {
     this.gridApi = params.api;

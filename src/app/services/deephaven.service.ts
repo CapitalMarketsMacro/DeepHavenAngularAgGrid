@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { Subject } from 'rxjs';
 
 export interface ConnectionConfig {
   serverUrl: string;
@@ -9,6 +10,12 @@ export interface ConnectionConfig {
 export interface TableData {
   columns: string[];
   rows: any[];
+}
+
+export interface TableTransaction {
+  add?: any[];
+  update?: any[];
+  remove?: any[];
 }
 
 @Injectable({
@@ -22,6 +29,15 @@ export class DeephavenService {
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
   readonly tableData = signal<TableData | null>(null);
+
+  // Subject for emitting row transactions (add/update/remove)
+  readonly transaction$ = new Subject<TableTransaction>();
+
+  // Store row key field for identifying rows
+  private rowKeyField: string | null = null;
+
+  // Map to track current rows by key for efficient lookups
+  private rowDataMap = new Map<string, any>();
 
   private client: any = null;
 
@@ -98,33 +114,118 @@ export class DeephavenService {
   private async subscribeToTable(): Promise<void> {
     if (!this.table) return;
 
-    const columns = this.table.columns.map((col: any) => col.name);
+    // Get column names for data extraction
+    const columns: string[] = this.table.columns.map((col: any) => col.name);
 
-    // Set viewport to get data
-    this.table.setViewport(0, this.table.size > 10000 ? 10000 : this.table.size);
+    // Use the first column as the row key field (typically an ID column)
+    this.rowKeyField = columns[0];
+    this.rowDataMap.clear();
 
-    // Listen for updates
-    this.table.addEventListener('updated', (event: any) => {
+    // Subscribe to all columns for full table updates
+    const subscription = await this.table.subscribe(this.table.columns);
+
+    console.log('Subscribed to table with columns:', columns);
+
+    // Listen for updates - full subscription gives us all rows + deltas
+    subscription.addEventListener('updated', (event: any) => {
       this.handleTableUpdate(event, columns);
     });
   }
 
   private handleTableUpdate(event: any, columns: string[]): void {
-    const rows: any[] = [];
-    const viewportData = event.detail;
+    const { rows } = event.detail;
+    const isInitialLoad = this.rowDataMap.size === 0;
 
-    for (let i = viewportData.offset; i < viewportData.offset + viewportData.rows.length; i++) {
-      const row = viewportData.rows[i - viewportData.offset];
-      const rowData: any = {};
+    // Get column objects for row.get()
+    const columnObjects = this.table.columns;
 
-      columns.forEach((col: string, index: number) => {
-        rowData[col] = row.get(this.table.columns[index]);
+    // Build current rows map
+    const currentRows = new Map<string, any>();
+    const allRows: any[] = [];
+
+    rows.forEach((row: any, index: number) => {
+      const rowData: any = { __rowIndex: index };
+
+      // Extract column values using column objects
+      columns.forEach((colName: string) => {
+        const colObj = columnObjects.find((c: any) => c.name === colName);
+        if (colObj) {
+          rowData[colName] = row.get(colObj);
+        }
       });
 
-      rows.push(rowData);
-    }
+      const rowKey = this.rowKeyField ? String(rowData[this.rowKeyField]) : String(index);
+      currentRows.set(rowKey, rowData);
+      allRows.push(rowData);
+    });
 
-    this.tableData.set({ columns, rows });
+    if (isInitialLoad) {
+      // Initial load - set all data
+      console.log('Initial load with', allRows.length, 'rows');
+      this.rowDataMap = currentRows;
+      this.tableData.set({ columns, rows: allRows });
+    } else {
+      // Detect changes by comparing with previous state
+      const addedRows: any[] = [];
+      const updatedRows: any[] = [];
+      const removedRows: any[] = [];
+
+      // Find added and updated rows
+      for (const [key, rowData] of currentRows.entries()) {
+        const existingRow = this.rowDataMap.get(key);
+        if (!existingRow) {
+          // New row
+          addedRows.push(rowData);
+        } else if (this.hasRowChanged(existingRow, rowData, columns)) {
+          // Row was modified
+          updatedRows.push(rowData);
+        }
+      }
+
+      // Find removed rows
+      for (const [key, rowData] of this.rowDataMap.entries()) {
+        if (!currentRows.has(key)) {
+          removedRows.push(rowData);
+        }
+      }
+
+      // Update our map to current state
+      this.rowDataMap = currentRows;
+
+      // Emit transaction if there are changes
+      if (addedRows.length > 0 || updatedRows.length > 0 || removedRows.length > 0) {
+        const transaction: TableTransaction = {};
+
+        if (addedRows.length > 0) {
+          transaction.add = addedRows;
+        }
+        if (updatedRows.length > 0) {
+          transaction.update = updatedRows;
+        }
+        if (removedRows.length > 0) {
+          transaction.remove = removedRows;
+        }
+
+        console.log('Emitting transaction:', {
+          add: addedRows.length,
+          update: updatedRows.length,
+          remove: removedRows.length
+        });
+        this.transaction$.next(transaction);
+      }
+
+      // Also update tableData signal for consistency
+      this.tableData.set({ columns, rows: allRows });
+    }
+  }
+
+  private hasRowChanged(oldRow: any, newRow: any, columns: string[]): boolean {
+    for (const col of columns) {
+      if (oldRow[col] !== newRow[col]) {
+        return true;
+      }
+    }
+    return false;
   }
 
   disconnect(): void {
@@ -142,5 +243,11 @@ export class DeephavenService {
     }
     this.isConnected.set(false);
     this.tableData.set(null);
+    this.rowDataMap.clear();
+    this.rowKeyField = null;
+  }
+
+  getRowKeyField(): string | null {
+    return this.rowKeyField;
   }
 }
