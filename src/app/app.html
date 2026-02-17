@@ -8,6 +8,11 @@
         @if (connectionInfo) {
           <span class="connection-details">
             Connected to: {{ connectionInfo.serverUrl }} | Table: {{ connectionInfo.tableName }}
+            @if (useViewport()) {
+              <span class="mode-badge viewport">Viewport Mode</span>
+            } @else {
+              <span class="mode-badge client-side">Client-Side Mode</span>
+            }
           </span>
         }
       </div>
@@ -20,17 +25,34 @@
       } @else if (error()) {
         <div class="error">{{ error() }}</div>
       } @else {
-        <ag-grid-angular
-          [theme]="theme"
-          [rowData]="rowData()"
-          [columnDefs]="columnDefs()"
-          [defaultColDef]="defaultColDef"
-          [getRowId]="getRowId"
-          (gridReady)="onGridReady($event)"
-          [animateRows]="true"
-          [pagination]="true"
-          [paginationPageSize]="100"
-        />
+        @if (useViewport()) {
+          <!-- Viewport Row Model - for large datasets with server-side sorting -->
+          <ag-grid-angular
+            [theme]="theme"
+            [columnDefs]="columnDefs()"
+            [defaultColDef]="defaultColDef"
+            [rowModelType]="'viewport'"
+            [viewportRowModelPageSize]="100"
+            [viewportRowModelBufferSize]="50"
+            (gridReady)="onGridReady($event)"
+            (sortChanged)="onSortChanged($event)"
+            (filterChanged)="onFilterChanged($event)"
+            [animateRows]="true"
+          />
+        } @else {
+          <!-- Client-Side Row Model - with transactions for updates -->
+          <ag-grid-angular
+            [theme]="theme"
+            [rowData]="rowData()"
+            [columnDefs]="columnDefs()"
+            [defaultColDef]="defaultColDef"
+            [getRowId]="getRowId"
+            (gridReady)="onGridReady($event)"
+            [animateRows]="true"
+            [pagination]="true"
+            [paginationPageSize]="100"
+          />
+        }
       }
     </main>
   }
