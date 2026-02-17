@@ -5,6 +5,12 @@ export interface ConnectionConfig {
   serverUrl: string;
   authToken: string;
   tableName: string;
+  isEnterprise?: boolean;
+}
+
+export interface TableInfo {
+  name: string;
+  type: string;
 }
 
 export interface TableData {
@@ -46,8 +52,8 @@ export class DeephavenService {
     this.error.set(null);
 
     try {
-      // Dynamically import DeepHaven API
-      const dh = await this.loadDeephavenApi(config.serverUrl);
+      // Dynamically import DeepHaven API (OSS or Enterprise)
+      const dh = await this.loadDeephavenApi(config.serverUrl, config.isEnterprise);
       console.log('DeepHaven API loaded:', dh);
 
       // Create client
@@ -87,27 +93,110 @@ export class DeephavenService {
     }
   }
 
-  private async loadDeephavenApi(serverUrl: string): Promise<any> {
+  private async loadDeephavenApi(serverUrl: string, isEnterprise: boolean = false): Promise<any> {
     // Check if already loaded
     if ((window as any).dh) {
       console.log('DeepHaven API already loaded');
       return (window as any).dh;
     }
 
-    // Use dynamic import as per DeepHaven documentation
-    // https://deephaven.io/core/docs/how-to-guides/use-jsapi/
-    const apiUrl = `${serverUrl}/jsapi/dh-core.js`;
-    console.log(`Loading DeepHaven API from: ${apiUrl}`);
-
     try {
-      const dh = await import(/* webpackIgnore: true */ apiUrl);
-      const api = dh.default || dh;
+      let api: any;
+
+      if (isEnterprise) {
+        // Import from npm package for Enterprise
+        // Use dynamic import with variable to avoid TypeScript module resolution
+        console.log('Loading DeepHaven Enterprise API from npm package...');
+        const enterpriseModule = '@deephaven-enterprise/jsapi';
+        const dh = await (Function('modulePath', 'return import(modulePath)')(enterpriseModule));
+        api = dh.default || dh;
+        console.log('DeepHaven Enterprise API loaded successfully');
+      } else {
+        // Load from server for OSS
+        const apiUrl = `${serverUrl}/jsapi/dh-core.js`;
+        console.log(`Loading DeepHaven OSS API from: ${apiUrl}`);
+        const dh = await import(/* webpackIgnore: true */ apiUrl);
+        api = dh.default || dh;
+        console.log('DeepHaven OSS API loaded successfully');
+      }
+
       (window as any).dh = api;
-      console.log('DeepHaven API loaded successfully');
       return api;
     } catch (err) {
       console.error('Failed to load DeepHaven API:', err);
-      throw new Error(`Failed to load DeepHaven API from ${serverUrl}. Check if the server is accessible and CORS is enabled.`);
+      const source = isEnterprise ? '@deephaven-enterprise/jsapi package' : serverUrl;
+      throw new Error(`Failed to load DeepHaven API from ${source}. ${isEnterprise ? 'Check if the package is installed.' : 'Check if the server is accessible and CORS is enabled.'}`);
+    }
+  }
+
+  async fetchAvailableTables(serverUrl: string, authToken: string, isEnterprise: boolean = false): Promise<TableInfo[]> {
+    try {
+      // Load the DeepHaven API (OSS or Enterprise)
+      const dh = await this.loadDeephavenApi(serverUrl, isEnterprise);
+
+      // Create client and login
+      const client = new dh.CoreClient(serverUrl);
+      await client.login({
+        type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
+        token: authToken
+      });
+
+      // Get IDE connection
+      const session = await client.getAsIdeConnection();
+
+      if (!session) {
+        throw new Error('Failed to get IDE connection');
+      }
+
+      // Get list of tables from the session
+      // The session has a getKnownConfigs or similar method
+      const tables: TableInfo[] = [];
+
+      // Try to get table names from session
+      // DeepHaven exposes tables via getObject or listObjects
+      if (typeof session.getKnownConfigs === 'function') {
+        const configs = await session.getKnownConfigs();
+        console.log('Known configs:', configs);
+      }
+
+      // Use subscribeToFieldUpdates to get available objects
+      if (typeof session.subscribeToFieldUpdates === 'function') {
+        return new Promise<TableInfo[]>((resolve) => {
+          const tableList: TableInfo[] = [];
+
+          session.subscribeToFieldUpdates((updates: any) => {
+            console.log('Field updates:', updates);
+
+            if (updates.created) {
+              for (const field of updates.created) {
+                // Filter for table types
+                if (field.type === 'Table' || field.type === 'PartitionedTable' ||
+                    field.type?.includes('Table')) {
+                  tableList.push({
+                    name: field.name,
+                    type: field.type
+                  });
+                }
+              }
+            }
+
+            // Resolve after getting initial field list
+            // Use setTimeout to ensure we capture initial batch
+            setTimeout(() => {
+              console.log('Available tables:', tableList);
+              resolve(tableList);
+            }, 500);
+          });
+        });
+      }
+
+      // Fallback: try getConsoleTypes or other methods
+      console.log('Session methods:', Object.keys(session));
+
+      return tables;
+    } catch (err: any) {
+      console.error('Failed to fetch available tables:', err);
+      throw new Error(err.message || 'Failed to fetch table list from DeepHaven');
     }
   }
 

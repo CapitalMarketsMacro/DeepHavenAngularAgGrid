@@ -2,59 +2,65 @@
   <div class="dialog">
     <h2>Connect to DeepHaven</h2>
 
-    <form (ngSubmit)="onSubmit()">
-      <div class="form-group">
-        <label for="serverUrl">DeepHaven Server URL</label>
-        <input
-          type="text"
-          id="serverUrl"
-          [ngModel]="serverUrl()"
-          (ngModelChange)="serverUrl.set($event)"
-          name="serverUrl"
-          placeholder="http://montunoblenumbat2404:10000"
-          [disabled]="isSubmitting()"
-        />
-      </div>
+    @if (isLoadingConfig()) {
+      <div class="loading-config">Loading configuration...</div>
+    } @else if (configError()) {
+      <div class="error-message">{{ configError() }}</div>
+    } @else {
+      <form (ngSubmit)="onSubmit()">
+        <div class="form-group">
+          <label>Select Table</label>
 
-      <div class="form-group">
-        <label for="authToken">Auth Token (PSK)</label>
-        <input
-          type="password"
-          id="authToken"
-          [ngModel]="authToken()"
-          (ngModelChange)="authToken.set($event)"
-          name="authToken"
-          placeholder="Enter PSK token"
-          [disabled]="isSubmitting()"
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="tableName">Table Name</label>
-        <input
-          type="text"
-          id="tableName"
-          [ngModel]="tableName()"
-          (ngModelChange)="tableName.set($event)"
-          name="tableName"
-          placeholder="e.g., myTable or scope/tableName"
-          [disabled]="isSubmitting()"
-        />
-      </div>
-
-      @if (errorMessage()) {
-        <div class="error-message">
-          {{ errorMessage() }}
+          @if (isLoadingTables()) {
+            <div class="loading-tables">Loading available tables...</div>
+          } @else if (availableTables().length > 0 && !useCustomTable()) {
+            <select
+              [ngModel]="selectedTable()"
+              (ngModelChange)="selectedTable.set($event)"
+              name="selectedTable"
+              [disabled]="isSubmitting()"
+            >
+              <option value="">-- Select a table --</option>
+              @for (table of availableTables(); track table.name) {
+                <option [value]="table.name">{{ table.name }} ({{ table.type }})</option>
+              }
+            </select>
+            <button type="button" class="link-button" (click)="toggleCustomTable()">
+              Or enter table name manually
+            </button>
+          } @else {
+            <input
+              type="text"
+              id="tableName"
+              [ngModel]="customTableName()"
+              (ngModelChange)="customTableName.set($event)"
+              name="customTableName"
+              placeholder="e.g., myTable or scope/tableName"
+              [disabled]="isSubmitting()"
+              autofocus
+            />
+            @if (availableTables().length > 0) {
+              <button type="button" class="link-button" (click)="toggleCustomTable()">
+                Select from available tables
+              </button>
+            }
+          }
         </div>
-      }
 
-      <button type="submit" [disabled]="isSubmitting()">
-        @if (isSubmitting()) {
-          Connecting...
-        } @else {
-          Connect
+        @if (errorMessage()) {
+          <div class="error-message">
+            {{ errorMessage() }}
+          </div>
         }
-      </button>
-    </form>
+
+        <button type="submit" [disabled]="isSubmitting() || isLoadingTables()">
+          @if (isSubmitting()) {
+            Connecting...
+          } @else {
+            Connect
+          }
+        </button>
+      </form>
+    }
   </div>
 </div>
