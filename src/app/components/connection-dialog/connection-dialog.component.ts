@@ -39,12 +39,44 @@ export class ConnectionDialogComponent implements OnInit {
   errorMessage = signal<string | null>(null);
   configError = signal<string | null>(null);
 
+  // Display current mode info
+  configMode = signal('');
+
   ngOnInit(): void {
     this.loadConfig();
   }
 
+  /**
+   * Determine which config file to load based on URL parameters
+   * URL params: ?enterprise=true|false&viewport=true|false
+   * Defaults: enterprise=false, viewport=false
+   */
+  private getConfigPath(): string {
+    const urlParams = new URLSearchParams(window.location.search);
+
+    // Parse URL parameters with defaults
+    const enterprise = urlParams.get('enterprise')?.toLowerCase() === 'true';
+    const viewport = urlParams.get('viewport')?.toLowerCase() === 'true';
+
+    // Build config filename based on parameters
+    const editionPart = enterprise ? 'enterprise' : 'oss';
+    const modePart = viewport ? 'viewport' : 'client';
+
+    const configPath = `/deephaven-config-${editionPart}-${modePart}.json`;
+
+    console.log('URL params:', { enterprise, viewport });
+    console.log('Loading config from:', configPath);
+
+    // Update display mode
+    this.configMode.set(`${enterprise ? 'Enterprise' : 'OSS'} / ${viewport ? 'Viewport' : 'Client-Side'}`);
+
+    return configPath;
+  }
+
   private loadConfig(): void {
-    this.http.get<DeephavenConfig>('/deephaven-config.json').subscribe({
+    const configPath = this.getConfigPath();
+
+    this.http.get<DeephavenConfig>(configPath).subscribe({
       next: (config) => {
         this.serverUrl = config.serverUrl;
         this.authToken = config.authToken;
@@ -61,7 +93,34 @@ export class ConnectionDialogComponent implements OnInit {
         this.fetchTables();
       },
       error: (err) => {
-        console.error('Failed to load DeepHaven config:', err);
+        console.error('Failed to load DeepHaven config from:', configPath);
+        // Fallback to default config
+        console.log('Falling back to default config');
+        this.loadDefaultConfig();
+      }
+    });
+  }
+
+  private loadDefaultConfig(): void {
+    this.http.get<DeephavenConfig>('/deephaven-config.json').subscribe({
+      next: (config) => {
+        this.serverUrl = config.serverUrl;
+        this.authToken = config.authToken;
+        this.isEnterprise = config.isEnterprise ?? false;
+        this.useViewport = config.useViewport ?? false;
+        this.isLoadingConfig.set(false);
+        this.configMode.set(`${this.isEnterprise ? 'Enterprise' : 'OSS'} / ${this.useViewport ? 'Viewport' : 'Client-Side'} (default)`);
+        console.log('Loaded default DeepHaven config:', {
+          serverUrl: config.serverUrl,
+          isEnterprise: this.isEnterprise,
+          useViewport: this.useViewport
+        });
+
+        // After loading config, fetch available tables
+        this.fetchTables();
+      },
+      error: (err) => {
+        console.error('Failed to load default DeepHaven config:', err);
         this.configError.set('Failed to load configuration. Please check deephaven-config.json');
         this.isLoadingConfig.set(false);
       }

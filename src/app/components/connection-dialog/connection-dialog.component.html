@@ -7,6 +7,12 @@
     } @else if (configError()) {
       <div class="error-message">{{ configError() }}</div>
     } @else {
+      @if (configMode()) {
+        <div class="config-mode">
+          Mode: <strong>{{ configMode() }}</strong>
+        </div>
+      }
+
       <form (ngSubmit)="onSubmit()">
         <div class="form-group">
           <label>Select Table</label>
@@ -61,6 +67,12 @@
           }
         </button>
       </form>
+
+      <div class="config-hint">
+        <small>
+          Configure via URL: <code>?enterprise=true|false&viewport=true|false</code>
+        </small>
+      </div>
     }
   </div>
 </div>
