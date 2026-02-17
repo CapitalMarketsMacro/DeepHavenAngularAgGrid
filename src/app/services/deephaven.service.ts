@@ -1,11 +1,13 @@
 import { Injectable, signal } from '@angular/core';
 import { Subject } from 'rxjs';
+import { DeephavenViewportDatasource } from './deephaven-viewport-datasource';
 
 export interface ConnectionConfig {
   serverUrl: string;
   authToken: string;
   tableName: string;
   isEnterprise?: boolean;
+  useViewport?: boolean;
 }
 
 export interface TableInfo {
@@ -35,6 +37,8 @@ export class DeephavenService {
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
   readonly tableData = signal<TableData | null>(null);
+  readonly useViewport = signal(false);
+  readonly viewportDatasource = signal<DeephavenViewportDatasource | null>(null);
 
   // Subject for emitting row transactions (add/update/remove)
   readonly transaction$ = new Subject<TableTransaction>();
@@ -50,6 +54,7 @@ export class DeephavenService {
   async connect(config: ConnectionConfig): Promise<void> {
     this.isLoading.set(true);
     this.error.set(null);
+    this.useViewport.set(config.useViewport ?? false);
 
     try {
       // Dynamically import DeepHaven API (OSS or Enterprise)
@@ -80,8 +85,20 @@ export class DeephavenService {
       this.table = await this.session.getTable(config.tableName);
       console.log('Table fetched:', this.table);
 
-      // Subscribe to table updates
-      await this.subscribeToTable();
+      if (config.useViewport) {
+        // Use Viewport Row Model - create datasource for AG Grid
+        console.log('Using Viewport Row Model');
+        const datasource = new DeephavenViewportDatasource(this.table);
+        this.viewportDatasource.set(datasource);
+
+        // Set initial column info for the grid
+        const columns = datasource.getColumnNames();
+        this.tableData.set({ columns, rows: [] });
+      } else {
+        // Use Client-Side Row Model - subscribe to full table updates
+        console.log('Using Client-Side Row Model');
+        await this.subscribeToTable();
+      }
 
       this.isConnected.set(true);
     } catch (err: any) {
@@ -318,6 +335,13 @@ export class DeephavenService {
   }
 
   disconnect(): void {
+    // Clean up viewport datasource if using viewport mode
+    const datasource = this.viewportDatasource();
+    if (datasource) {
+      datasource.destroy();
+      this.viewportDatasource.set(null);
+    }
+
     if (this.table) {
       this.table.close();
       this.table = null;
@@ -334,6 +358,7 @@ export class DeephavenService {
     this.tableData.set(null);
     this.rowDataMap.clear();
     this.rowKeyField = null;
+    this.useViewport.set(false);
   }
 
   getRowKeyField(): string | null {

@@ -1,6 +1,7 @@
 {
   "serverUrl": "http://montunoblenumbat2404:10000",
   "authToken": "mn2413",
-  "isEnterprise": false
+  "isEnterprise": false,
+  "useViewport": true
 }
 

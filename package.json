@@ -35,6 +35,7 @@
     "@deephaven/jsapi-types": "^41.1.0",
     "ag-grid-angular": "^35.0.0",
     "ag-grid-community": "^35.0.0",
+    "ag-grid-enterprise": "^35.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

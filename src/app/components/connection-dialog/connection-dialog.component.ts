@@ -7,6 +7,7 @@ export interface DeephavenConfig {
   serverUrl: string;
   authToken: string;
   isEnterprise?: boolean;
+  useViewport?: boolean;
 }
 
 @Component({
@@ -25,6 +26,7 @@ export class ConnectionDialogComponent implements OnInit {
   private serverUrl = '';
   private authToken = '';
   private isEnterprise = false;
+  private useViewport = false;
 
   availableTables = signal<TableInfo[]>([]);
   selectedTable = signal('');
@@ -47,10 +49,12 @@ export class ConnectionDialogComponent implements OnInit {
         this.serverUrl = config.serverUrl;
         this.authToken = config.authToken;
         this.isEnterprise = config.isEnterprise ?? false;
+        this.useViewport = config.useViewport ?? false;
         this.isLoadingConfig.set(false);
         console.log('Loaded DeepHaven config:', {
           serverUrl: config.serverUrl,
-          isEnterprise: this.isEnterprise
+          isEnterprise: this.isEnterprise,
+          useViewport: this.useViewport
         });
 
         // After loading config, fetch available tables
@@ -116,7 +120,8 @@ export class ConnectionDialogComponent implements OnInit {
       serverUrl: this.serverUrl,
       authToken: this.authToken,
       tableName: tableName,
-      isEnterprise: this.isEnterprise
+      isEnterprise: this.isEnterprise,
+      useViewport: this.useViewport
     });
   }
 
