@@ -96,7 +96,7 @@ export class DeephavenService {
       if (config.useViewport) {
         // Use Viewport Row Model - create datasource for AG Grid
         console.log('Using Viewport Row Model');
-        const datasource = new DeephavenViewportDatasource(this.table);
+        const datasource = new DeephavenViewportDatasource(dh, this.table);
         this.viewportDatasource.set(datasource);
 
         // Set initial column info for the grid

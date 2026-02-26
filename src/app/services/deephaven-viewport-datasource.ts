@@ -7,54 +7,27 @@ import { IViewportDatasource, IViewportDatasourceParams, SortModelItem } from 'a
  * stream data from DeepHaven tables using viewport-based updates.
  * Only rows visible in the grid viewport are fetched and updated.
  *
- * Key API facts:
- * - table.applySort / table.applyFilter are synchronous, mutate in place, return previous value
- * - table.setViewport(first, last, cols) returns a TableViewportSubscription
- * - subscription.setViewport(first, last, cols) updates the range on an existing subscription
- * - column.sort() takes no args, returns a Sort builder with .asc() / .desc()
- * - column.filter() takes no args, returns a FilterValue builder
+ * Filter implementation follows the official DeepHaven AG Grid plugin:
+ * https://github.com/deephaven/deephaven-plugins/blob/main/plugins/ag-grid/src/js/src/utils/AgGridFilterUtils.ts
  */
 export class DeephavenViewportDatasource implements IViewportDatasource {
   private params!: IViewportDatasourceParams;
   private table: any;
+  private dh: any;
   private columns: any[];
   private columnMap: Map<string, any>;
   private currentViewport: { firstRow: number; lastRow: number } | null = null;
   private subscription: any = null;
   private cleanupFns: Array<() => void> = [];
 
-  constructor(table: any) {
+  constructor(dh: any, table: any) {
+    this.dh = dh;
     this.table = table;
     this.columns = table.columns;
     this.columnMap = new Map();
     for (const col of this.columns) {
       this.columnMap.set(col.name, col);
     }
-  }
-
-  /** Access the DeepHaven API from the global namespace */
-  private get dh(): any {
-    return (window as any).dh;
-  }
-
-  /**
-   * Create a string FilterValue compatible with both DH Enterprise and OSS.
-   * Enterprise exposes ofString as an instance method on column.filter() that creates
-   * FilterValues with proper descriptor.getLiteral(). The static dh.FilterValue.ofString()
-   * creates FilterValues that lack getLiteral, breaking contains/matches operations.
-   */
-  private ofString(filterValue: any, value: string): any {
-    if (typeof filterValue.ofString === 'function') {
-      return filterValue.ofString(value);
-    }
-    return this.dh.FilterValue.ofString(value);
-  }
-
-  private ofNumber(filterValue: any, value: number): any {
-    if (typeof filterValue.ofNumber === 'function') {
-      return filterValue.ofNumber(value);
-    }
-    return this.dh.FilterValue.ofNumber(value);
   }
 
   /**
@@ -250,138 +223,138 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   }
 
   /**
-   * Build a single DH FilterCondition from an ag-Grid filter condition
+   * Build a single DH FilterCondition from an ag-Grid filter condition.
+   * Passes column (not column.filter()) to each builder so they can call
+   * column.filter() fresh for each operation, matching the reference implementation.
    */
   private buildSingleCondition(column: any, model: any): any {
-    const filterType = model.filterType; // 'text', 'number', 'date'
-    const type = model.type;             // 'contains', 'equals', 'greaterThan', etc.
-
-    // column.filter() returns a FilterCondition builder (NOT FilterValue)
-    const filterValue = column.filter();
-
-    switch (filterType) {
+    switch (model.filterType) {
       case 'text':
-        return this.buildTextCondition(filterValue, type, model.filter);
+        return this.buildTextCondition(column, model);
       case 'number':
-        return this.buildNumberCondition(filterValue, type, model.filter, model.filterTo);
+        return this.buildNumberCondition(column, model);
       case 'date':
-        return this.buildDateCondition(filterValue, type, model.dateFrom, model.dateTo);
+        return this.buildDateCondition(column, model);
       default:
-        console.warn(`Unsupported filter type: ${filterType}`);
+        console.warn(`Unsupported filter type: ${model.filterType}`);
         return null;
     }
   }
 
   /**
    * Build a text filter condition.
-   * Uses ofString() helper to create FilterValues compatible with both DH Enterprise and OSS.
+   * Matches the official DH AG Grid plugin: uses dh.FilterValue.ofString() (static),
+   * contains() (not containsIgnoreCase), and invoke() for startsWith/endsWith.
    */
-  private buildTextCondition(filterValue: any, type: string, value: string): any {
-    if (value == null) {
-      if (type === 'blank') return filterValue.isNull();
-      if (type === 'notBlank') return filterValue.isNull().not();
-      return null;
-    }
+  private buildTextCondition(column: any, model: any): any {
+    const filterValue = this.dh.FilterValue.ofString(model.filter ?? '');
 
-    const target = this.ofString(filterValue, value);
-
-    switch (type) {
+    switch (model.type) {
       case 'equals':
-        return filterValue.eq(target);
+        return column.filter().eq(filterValue);
       case 'notEqual':
-        return filterValue.notEq(target);
+        return column.filter().notEq(filterValue);
       case 'contains':
-        return filterValue.containsIgnoreCase(target);
+        return column.filter().contains(filterValue);
       case 'notContains':
-        return filterValue.containsIgnoreCase(target).not();
+        return column.filter().isNull()
+          .or(column.filter().contains(filterValue).not());
       case 'startsWith':
-        return filterValue.matches(this.ofString(filterValue, `${value}.*`));
+        return column.filter().isNull().not()
+          .and(column.filter().invoke('startsWith', filterValue));
       case 'endsWith':
-        return filterValue.matches(this.ofString(filterValue, `.*${value}`));
+        return column.filter().isNull().not()
+          .and(column.filter().invoke('endsWith', filterValue));
       case 'blank':
-        return filterValue.isNull();
+        return column.filter().isNull()
+          .or(column.filter().eq(filterValue));
       case 'notBlank':
-        return filterValue.isNull().not();
+        return column.filter().isNull().not()
+          .and(column.filter().notEq(this.dh.FilterValue.ofString('')));
       default:
-        console.warn(`Unsupported text filter type: ${type}`);
+        console.warn(`Unsupported text filter type: ${model.type}`);
         return null;
     }
   }
 
   /**
    * Build a number filter condition.
-   * Uses ofNumber() helper to create FilterValues compatible with both DH Enterprise and OSS.
+   * Matches the official DH AG Grid plugin.
    */
-  private buildNumberCondition(
-    filterValue: any,
-    type: string,
-    value: number,
-    valueTo?: number
-  ): any {
-    if (type === 'blank') return filterValue.isNull();
-    if (type === 'notBlank') return filterValue.isNull().not();
+  private buildNumberCondition(column: any, model: any): any {
+    switch (model.type) {
+      case 'blank':
+        return column.filter().isNull();
+      case 'notBlank':
+        return column.filter().isNull().not();
+    }
 
-    if (value == null) return null;
+    if (model.filter == null) return null;
 
-    const target = this.ofNumber(filterValue, value);
+    const filterValue = this.dh.FilterValue.ofNumber(model.filter);
 
-    switch (type) {
+    switch (model.type) {
       case 'equals':
-        return filterValue.eq(target);
+        return column.filter().eq(filterValue);
       case 'notEqual':
-        return filterValue.notEq(target);
+        return column.filter().notEq(filterValue);
       case 'greaterThan':
-        return filterValue.greaterThan(target);
+        return column.filter().greaterThan(filterValue);
       case 'greaterThanOrEqual':
-        return filterValue.greaterThanOrEqualTo(target);
+        return column.filter().greaterThanOrEqualTo(filterValue);
       case 'lessThan':
-        return filterValue.lessThan(target);
+        return column.filter().lessThan(filterValue);
       case 'lessThanOrEqual':
-        return filterValue.lessThanOrEqualTo(target);
-      case 'inRange':
-        if (valueTo == null) return null;
-        const targetTo = this.ofNumber(filterValue, valueTo);
-        return filterValue.greaterThanOrEqualTo(target).and(filterValue.lessThanOrEqualTo(targetTo));
+        return column.filter().lessThanOrEqualTo(filterValue);
+      case 'inRange': {
+        if (model.filterTo == null) return null;
+        const filterValueTo = this.dh.FilterValue.ofNumber(model.filterTo);
+        return column.filter().greaterThan(filterValue)
+          .and(column.filter().lessThan(filterValueTo));
+      }
       default:
-        console.warn(`Unsupported number filter type: ${type}`);
+        console.warn(`Unsupported number filter type: ${model.type}`);
         return null;
     }
   }
 
   /**
-   * Build a date filter condition
-   * Uses dh.DateWrapper.ofJsDate() to convert JS Date, then wraps in FilterValue.ofNumber()
+   * Build a date filter condition.
+   * Matches the official DH AG Grid plugin.
    */
-  private buildDateCondition(
-    filterValue: any,
-    type: string,
-    dateFrom?: string,
-    dateTo?: string
-  ): any {
-    if (type === 'blank') return filterValue.isNull();
-    if (type === 'notBlank') return filterValue.isNull().not();
+  private buildDateCondition(column: any, model: any): any {
+    switch (model.type) {
+      case 'blank':
+        return column.filter().isNull();
+      case 'notBlank':
+        return column.filter().isNull().not();
+    }
 
-    if (dateFrom == null) return null;
+    if (model.dateFrom == null) return null;
 
-    const fromDate = new Date(dateFrom);
-    const target = this.ofNumber(filterValue, this.dh.DateWrapper.ofJsDate(fromDate));
+    const filterValue = this.dh.FilterValue.ofNumber(
+      this.dh.DateWrapper.ofJsDate(new Date(model.dateFrom))
+    );
 
-    switch (type) {
+    switch (model.type) {
       case 'equals':
-        return filterValue.eq(target);
+        return column.filter().eq(filterValue);
       case 'notEqual':
-        return filterValue.notEq(target);
+        return column.filter().notEq(filterValue);
       case 'greaterThan':
-        return filterValue.greaterThan(target);
+        return column.filter().greaterThan(filterValue);
       case 'lessThan':
-        return filterValue.lessThan(target);
-      case 'inRange':
-        if (dateTo == null) return null;
-        const toDate = new Date(dateTo);
-        const targetTo = this.ofNumber(filterValue, this.dh.DateWrapper.ofJsDate(toDate));
-        return filterValue.greaterThanOrEqualTo(target).and(filterValue.lessThanOrEqualTo(targetTo));
+        return column.filter().lessThan(filterValue);
+      case 'inRange': {
+        if (model.dateTo == null) return null;
+        const filterValueTo = this.dh.FilterValue.ofNumber(
+          this.dh.DateWrapper.ofJsDate(new Date(model.dateTo))
+        );
+        return column.filter().greaterThan(filterValue)
+          .and(column.filter().lessThan(filterValueTo));
+      }
       default:
-        console.warn(`Unsupported date filter type: ${type}`);
+        console.warn(`Unsupported date filter type: ${model.type}`);
         return null;
     }
   }
