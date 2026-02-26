@@ -28,6 +28,55 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
     for (const col of this.columns) {
       this.columnMap.set(col.name, col);
     }
+
+    // Detect whether the static dh.FilterValue.ofString creates compatible FilterValues.
+    // On Enterprise, static ofString creates FilterDescriptor (wrong type) instead of
+    // protobuf Value descriptors. In that case we must use instance methods on column.filter().
+    this.useInstanceFilterValue = this.detectFilterValueCompat();
+  }
+
+  /**
+   * Check if dh.FilterValue.ofString creates compatible FilterValues.
+   * Enterprise's static ofString creates FilterDescriptor objects that lack
+   * protobuf methods (toArray, getLiteral) needed by eq/contains/etc.
+   */
+  private useInstanceFilterValue = false;
+
+  private detectFilterValueCompat(): boolean {
+    try {
+      const testFv = this.dh.FilterValue.ofString('__test__');
+      // On Enterprise, the descriptor is a FilterDescriptor (has type_0, children, etc.)
+      // On OSS, the descriptor is a protobuf Literal with getLiteral/toArray
+      if (testFv?.descriptor && typeof testFv.descriptor.toArray !== 'function') {
+        console.log('Enterprise FilterValue detected: using instance methods for filter values');
+        return true;
+      }
+    } catch (e) {
+      console.warn('FilterValue compat check failed:', e);
+    }
+    return false;
+  }
+
+  /**
+   * Create a string FilterValue compatible with both OSS and Enterprise.
+   * Enterprise: uses column.filter().ofString() which creates protobuf Value descriptors.
+   * OSS: uses static dh.FilterValue.ofString().
+   */
+  private createStringValue(column: any, value: string): any {
+    if (this.useInstanceFilterValue) {
+      return column.filter().ofString(value);
+    }
+    return this.dh.FilterValue.ofString(value);
+  }
+
+  /**
+   * Create a number FilterValue compatible with both OSS and Enterprise.
+   */
+  private createNumberValue(column: any, value: number): any {
+    if (this.useInstanceFilterValue) {
+      return column.filter().ofNumber(value);
+    }
+    return this.dh.FilterValue.ofNumber(value);
   }
 
   /**
@@ -248,21 +297,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
    * contains() (not containsIgnoreCase), and invoke() for startsWith/endsWith.
    */
   private buildTextCondition(column: any, model: any): any {
-    const filterValue = this.dh.FilterValue.ofString(model.filter ?? '');
-
-    // Diagnostic logging for Enterprise debugging
-    console.log('DH FilterValue diagnostics:', {
-      dhExists: !!this.dh,
-      filterValueClass: this.dh.FilterValue?.toString?.(),
-      ofStringType: typeof this.dh.FilterValue?.ofString,
-      createdFilterValue: filterValue,
-      filterValueKeys: filterValue ? Object.keys(filterValue) : 'null',
-      hasDescriptor: !!filterValue?.descriptor,
-      descriptorKeys: filterValue?.descriptor ? Object.keys(filterValue.descriptor) : 'none',
-      hasGetLiteral: typeof filterValue?.descriptor?.getLiteral,
-      columnFilterResult: column.filter(),
-      columnFilterKeys: Object.keys(column.filter()),
-    });
+    const filterValue = this.createStringValue(column, model.filter ?? '');
 
     switch (model.type) {
       case 'equals':
@@ -306,7 +341,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
     if (model.filter == null) return null;
 
-    const filterValue = this.dh.FilterValue.ofNumber(model.filter);
+    const filterValue = this.createNumberValue(column, model.filter);
 
     switch (model.type) {
       case 'equals':
@@ -323,7 +358,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         return column.filter().lessThanOrEqualTo(filterValue);
       case 'inRange': {
         if (model.filterTo == null) return null;
-        const filterValueTo = this.dh.FilterValue.ofNumber(model.filterTo);
+        const filterValueTo = this.createNumberValue(column, model.filterTo);
         return column.filter().greaterThan(filterValue)
           .and(column.filter().lessThan(filterValueTo));
       }
@@ -347,9 +382,8 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
     if (model.dateFrom == null) return null;
 
-    const filterValue = this.dh.FilterValue.ofNumber(
-      this.dh.DateWrapper.ofJsDate(new Date(model.dateFrom))
-    );
+    const dateWrapper = this.dh.DateWrapper.ofJsDate(new Date(model.dateFrom));
+    const filterValue = this.createNumberValue(column, dateWrapper);
 
     switch (model.type) {
       case 'equals':
@@ -362,9 +396,8 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         return column.filter().lessThan(filterValue);
       case 'inRange': {
         if (model.dateTo == null) return null;
-        const filterValueTo = this.dh.FilterValue.ofNumber(
-          this.dh.DateWrapper.ofJsDate(new Date(model.dateTo))
-        );
+        const dateWrapperTo = this.dh.DateWrapper.ofJsDate(new Date(model.dateTo));
+        const filterValueTo = this.createNumberValue(column, dateWrapperTo);
         return column.filter().greaterThan(filterValue)
           .and(column.filter().lessThan(filterValueTo));
       }
