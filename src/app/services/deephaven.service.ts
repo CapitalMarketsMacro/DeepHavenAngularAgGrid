@@ -129,23 +129,13 @@ export class DeephavenService {
       let api: any;
 
       if (isEnterprise) {
-        // Enterprise: load from npm package first (creates compatible FilterValues),
-        // fall back to server URL if unavailable
-        try {
-          console.log('Loading DeepHaven Enterprise API from npm package...');
-          const enterpriseModule = '@deephaven-enterprise/jsapi';
-          const dh = await (Function('modulePath', 'return import(modulePath)')(enterpriseModule));
-          api = dh.default || dh;
-          console.log('DeepHaven Enterprise API loaded from npm package');
-        } catch (npmErr) {
-          console.log('npm package load failed, trying server URL...');
-          const apiUrl = `${serverUrl}/jsapi/dh-core.js`;
-          const dh = await import(/* webpackIgnore: true */ apiUrl);
-          api = dh.default || dh;
-          console.log('DeepHaven Enterprise API loaded from server');
-        }
+        // Enterprise: load the GWT-compiled Iris API from the server.
+        // irisapi.nocache.js is a GWT module that must be loaded as a script tag
+        // (not an ES module import). It initializes and exposes the dh API on window.
+        api = await this.loadEnterpriseGwtApi(serverUrl);
+        console.log('DeepHaven Enterprise API loaded from irisapi');
       } else {
-        // OSS: load from server URL
+        // OSS: load dh-core.js as an ES module from the server
         const apiUrl = `${serverUrl}/jsapi/dh-core.js`;
         console.log(`Loading DeepHaven OSS API from: ${apiUrl}`);
         const dh = await import(/* webpackIgnore: true */ apiUrl);
@@ -157,9 +147,51 @@ export class DeephavenService {
       return api;
     } catch (err) {
       console.error('Failed to load DeepHaven API:', err);
-      const source = isEnterprise ? '@deephaven-enterprise/jsapi package or server' : serverUrl;
+      const source = isEnterprise ? `${serverUrl}/irisapi/irisapi.nocache.js` : serverUrl;
       throw new Error(`Failed to load DeepHaven API from ${source}. Check if the server is accessible and CORS is enabled.`);
     }
+  }
+
+  /**
+   * Load the Enterprise DH API by injecting the GWT script tag.
+   * irisapi.nocache.js is a GWT-compiled module that initializes asynchronously
+   * and exposes the dh API on the window object.
+   */
+  private loadEnterpriseGwtApi(serverUrl: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const scriptUrl = `${serverUrl}/irisapi/irisapi.nocache.js`;
+      console.log(`Loading DeepHaven Enterprise GWT API from: ${scriptUrl}`);
+
+      const script = document.createElement('script');
+      script.src = scriptUrl;
+      script.async = true;
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('Timeout waiting for DH Enterprise API to initialize (15s)'));
+      }, 15000);
+
+      // Poll for the dh API to become available on window
+      const poll = setInterval(() => {
+        if ((window as any).dh) {
+          cleanup();
+          console.log('DeepHaven Enterprise dh API detected on window');
+          resolve((window as any).dh);
+        }
+      }, 100);
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        clearInterval(poll);
+      };
+
+      script.onerror = () => {
+        cleanup();
+        reject(new Error(`Failed to load Enterprise API script: ${scriptUrl}`));
+      };
+
+      document.head.appendChild(script);
+    });
   }
 
   async fetchAvailableTables(serverUrl: string, authToken: string, isEnterprise: boolean = false): Promise<TableInfo[]> {
