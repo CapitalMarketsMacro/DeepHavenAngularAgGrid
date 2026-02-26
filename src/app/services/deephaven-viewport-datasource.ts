@@ -250,6 +250,20 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   private buildTextCondition(column: any, model: any): any {
     const filterValue = this.dh.FilterValue.ofString(model.filter ?? '');
 
+    // Diagnostic logging for Enterprise debugging
+    console.log('DH FilterValue diagnostics:', {
+      dhExists: !!this.dh,
+      filterValueClass: this.dh.FilterValue?.toString?.(),
+      ofStringType: typeof this.dh.FilterValue?.ofString,
+      createdFilterValue: filterValue,
+      filterValueKeys: filterValue ? Object.keys(filterValue) : 'null',
+      hasDescriptor: !!filterValue?.descriptor,
+      descriptorKeys: filterValue?.descriptor ? Object.keys(filterValue.descriptor) : 'none',
+      hasGetLiteral: typeof filterValue?.descriptor?.getLiteral,
+      columnFilterResult: column.filter(),
+      columnFilterKeys: Object.keys(column.filter()),
+    });
+
     switch (model.type) {
       case 'equals':
         return column.filter().eq(filterValue);
