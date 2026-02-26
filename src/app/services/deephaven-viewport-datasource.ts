@@ -38,6 +38,26 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   }
 
   /**
+   * Create a string FilterValue compatible with both DH Enterprise and OSS.
+   * Enterprise exposes ofString as an instance method on column.filter() that creates
+   * FilterValues with proper descriptor.getLiteral(). The static dh.FilterValue.ofString()
+   * creates FilterValues that lack getLiteral, breaking contains/matches operations.
+   */
+  private ofString(filterValue: any, value: string): any {
+    if (typeof filterValue.ofString === 'function') {
+      return filterValue.ofString(value);
+    }
+    return this.dh.FilterValue.ofString(value);
+  }
+
+  private ofNumber(filterValue: any, value: number): any {
+    if (typeof filterValue.ofNumber === 'function') {
+      return filterValue.ofNumber(value);
+    }
+    return this.dh.FilterValue.ofNumber(value);
+  }
+
+  /**
    * Called by AG Grid to initialize the datasource
    */
   init(params: IViewportDatasourceParams): void {
@@ -253,8 +273,8 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   }
 
   /**
-   * Build a text filter condition
-   * FilterValue.ofString() is a static method on dh.FilterValue, not on the filter builder
+   * Build a text filter condition.
+   * Uses ofString() helper to create FilterValues compatible with both DH Enterprise and OSS.
    */
   private buildTextCondition(filterValue: any, type: string, value: string): any {
     if (value == null) {
@@ -263,7 +283,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
       return null;
     }
 
-    const target = this.dh.FilterValue.ofString(value);
+    const target = this.ofString(filterValue, value);
 
     switch (type) {
       case 'equals':
@@ -271,14 +291,13 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
       case 'notEqual':
         return filterValue.notEq(target);
       case 'contains':
-        // Use native matches() with regex — avoids both $makeContains getLiteral bug and invoke() ArrayStoreException
-        return filterValue.matches(this.dh.FilterValue.ofString(`.*\\Q${value}\\E.*`));
+        return filterValue.containsIgnoreCase(target);
       case 'notContains':
-        return filterValue.matches(this.dh.FilterValue.ofString(`.*\\Q${value}\\E.*`)).not();
+        return filterValue.containsIgnoreCase(target).not();
       case 'startsWith':
-        return filterValue.matches(this.dh.FilterValue.ofString(`\\Q${value}\\E.*`));
+        return filterValue.matches(this.ofString(filterValue, `${value}.*`));
       case 'endsWith':
-        return filterValue.matches(this.dh.FilterValue.ofString(`.*\\Q${value}\\E`));
+        return filterValue.matches(this.ofString(filterValue, `.*${value}`));
       case 'blank':
         return filterValue.isNull();
       case 'notBlank':
@@ -290,8 +309,8 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   }
 
   /**
-   * Build a number filter condition
-   * FilterValue.ofNumber() is a static method on dh.FilterValue, not on the filter builder
+   * Build a number filter condition.
+   * Uses ofNumber() helper to create FilterValues compatible with both DH Enterprise and OSS.
    */
   private buildNumberCondition(
     filterValue: any,
@@ -304,7 +323,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
     if (value == null) return null;
 
-    const target = this.dh.FilterValue.ofNumber(value);
+    const target = this.ofNumber(filterValue, value);
 
     switch (type) {
       case 'equals':
@@ -321,7 +340,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         return filterValue.lessThanOrEqualTo(target);
       case 'inRange':
         if (valueTo == null) return null;
-        const targetTo = this.dh.FilterValue.ofNumber(valueTo);
+        const targetTo = this.ofNumber(filterValue, valueTo);
         return filterValue.greaterThanOrEqualTo(target).and(filterValue.lessThanOrEqualTo(targetTo));
       default:
         console.warn(`Unsupported number filter type: ${type}`);
@@ -345,7 +364,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
     if (dateFrom == null) return null;
 
     const fromDate = new Date(dateFrom);
-    const target = this.dh.FilterValue.ofNumber(this.dh.DateWrapper.ofJsDate(fromDate));
+    const target = this.ofNumber(filterValue, this.dh.DateWrapper.ofJsDate(fromDate));
 
     switch (type) {
       case 'equals':
@@ -359,7 +378,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
       case 'inRange':
         if (dateTo == null) return null;
         const toDate = new Date(dateTo);
-        const targetTo = this.dh.FilterValue.ofNumber(this.dh.DateWrapper.ofJsDate(toDate));
+        const targetTo = this.ofNumber(filterValue, this.dh.DateWrapper.ofJsDate(toDate));
         return filterValue.greaterThanOrEqualTo(target).and(filterValue.lessThanOrEqualTo(targetTo));
       default:
         console.warn(`Unsupported date filter type: ${type}`);
