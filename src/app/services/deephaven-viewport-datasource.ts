@@ -20,8 +20,10 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   private subscription: any = null;
   private cleanupFns: Array<() => void> = [];
 
-  // Resolved FilterValue class — may differ from dh.FilterValue on Enterprise
-  private _FV: any = null;
+  // Enterprise mode: pass raw JS values to filter methods instead of FilterValue wrappers.
+  // Enterprise DH docs show: column.filter().eq("A") — raw strings, no FilterValue wrapper.
+  // OSS DH requires: column.filter().eq(dh.FilterValue.ofString("A")).
+  private _useRawValues: boolean | null = null;
 
   constructor(dh: any, table: any) {
     this.dh = dh;
@@ -34,81 +36,38 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   }
 
   /**
-   * Resolve a FilterValue class that creates protobuf-compatible values.
-   * Enterprise DH's dh.FilterValue.ofString() may create FilterDescriptor objects
-   * that lack toArray(), causing errors in protobuf serialization.
-   * Fallback: derive the class from column.filter() which IS protobuf-compatible.
+   * Detect whether to use raw JS values (Enterprise) or FilterValue wrappers (OSS).
+   * Enterprise's dh.FilterValue.ofString() creates FilterDescriptor objects that
+   * are incompatible with the protobuf-based column.filter().eq(). The Enterprise
+   * docs show raw values passed directly: column.filter().eq("A").
    */
-  private resolveFilterValueClass(column?: any): any {
-    if (this._FV) return this._FV;
+  private useRawValues(): boolean {
+    if (this._useRawValues !== null) return this._useRawValues;
 
-    // Test standard dh.FilterValue
     if (this.dh.FilterValue?.ofString) {
       try {
-        const test = this.ofString('_test_');
+        const test = this.dh.FilterValue.ofString('_test_');
         if (typeof test?.toArray === 'function') {
-          this._FV = this.dh.FilterValue;
-          console.log('FilterValue: using dh.FilterValue (standard)');
-          return this._FV;
+          this._useRawValues = false;
+          console.log('Filter mode: OSS (using FilterValue wrappers)');
+          return false;
         }
-        console.log('dh.FilterValue.ofString() lacks toArray, trying alternatives...');
-      } catch (e) {
-        console.log('dh.FilterValue.ofString() threw:', e);
-      }
+      } catch (_) { /* fall through */ }
     }
 
-    // Enterprise fallback: column.filter() returns a protobuf FilterValue.
-    // Its constructor should have the same static factory methods.
-    const col = column || this.columns[0];
-    if (col) {
-      try {
-        const colFilter = col.filter();
-        const ctor = colFilter?.constructor;
-        console.log('column.filter() constructor:', ctor?.name,
-          'has ofString:', typeof ctor?.ofString,
-          'has ofNumber:', typeof ctor?.ofNumber);
-
-        if (typeof ctor?.ofString === 'function') {
-          const test = ctor.ofString('_test_');
-          if (typeof test?.toArray === 'function') {
-            this._FV = ctor;
-            console.log('FilterValue: using column.filter().constructor (Enterprise compat)');
-            return this._FV;
-          }
-        }
-      } catch (e) {
-        console.log('column.filter().constructor approach failed:', e);
-      }
-    }
-
-    // Last resort: log all available info for debugging
-    console.warn('No protobuf-compatible FilterValue found. Dumping diagnostics:');
-    console.log('dh keys:', Object.keys(this.dh));
-    if (this.dh.FilterValue) {
-      console.log('dh.FilterValue keys:', Object.keys(this.dh.FilterValue));
-      console.log('dh.FilterValue.prototype keys:', this.dh.FilterValue.prototype
-        ? Object.getOwnPropertyNames(this.dh.FilterValue.prototype) : 'no prototype');
-    }
-    if (col) {
-      const cf = col.filter();
-      console.log('column.filter() type:', typeof cf, 'keys:', Object.keys(cf));
-      console.log('column.filter().constructor:', cf?.constructor?.name);
-      console.log('column.filter().constructor keys:', cf?.constructor
-        ? Object.getOwnPropertyNames(cf.constructor) : 'none');
-    }
-
-    this._FV = this.dh.FilterValue;
-    return this._FV;
+    this._useRawValues = true;
+    console.log('Filter mode: Enterprise (using raw JS values)');
+    return true;
   }
 
-  /** Create a string FilterValue using the resolved compatible class */
+  /** Create a string filter value — raw string for Enterprise, FilterValue for OSS */
   private ofString(value: string): any {
-    return this.resolveFilterValueClass().ofString(value);
+    return this.useRawValues() ? value : this.dh.FilterValue.ofString(value);
   }
 
-  /** Create a number FilterValue using the resolved compatible class */
+  /** Create a number filter value — raw number for Enterprise, FilterValue for OSS */
   private ofNumber(value: number | any): any {
-    return this.resolveFilterValueClass().ofNumber(value);
+    return this.useRawValues() ? value : this.dh.FilterValue.ofNumber(value);
   }
 
   /**
@@ -253,9 +212,6 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         console.warn(`Column not found for filtering: ${colId}`);
         continue;
       }
-
-      // Ensure FilterValue class is resolved before building conditions
-      this.resolveFilterValueClass(column);
 
       try {
         const condition = this.buildFilterCondition(column, model);
