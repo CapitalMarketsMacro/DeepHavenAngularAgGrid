@@ -128,29 +128,33 @@ export class DeephavenService {
     try {
       let api: any;
 
-      if (isEnterprise) {
-        // Import from npm package for Enterprise
-        // Use dynamic import with variable to avoid TypeScript module resolution
-        console.log('Loading DeepHaven Enterprise API from npm package...');
+      // Always load the JSAPI from the server URL first.
+      // Both OSS and Enterprise servers serve dh-core.js at /jsapi/dh-core.js.
+      // The npm package @deephaven-enterprise/jsapi creates FilterValue objects
+      // with incompatible internal descriptors, breaking filter operations.
+      const apiUrl = `${serverUrl}/jsapi/dh-core.js`;
+      console.log(`Loading DeepHaven API from server: ${apiUrl}`);
+
+      try {
+        const dh = await import(/* webpackIgnore: true */ apiUrl);
+        api = dh.default || dh;
+        console.log('DeepHaven API loaded from server successfully');
+      } catch (serverErr) {
+        if (!isEnterprise) throw serverErr;
+
+        // Fallback to npm package for Enterprise if server load fails
+        console.log('Server load failed, falling back to Enterprise npm package...');
         const enterpriseModule = '@deephaven-enterprise/jsapi';
         const dh = await (Function('modulePath', 'return import(modulePath)')(enterpriseModule));
         api = dh.default || dh;
-        console.log('DeepHaven Enterprise API loaded successfully');
-      } else {
-        // Load from server for OSS
-        const apiUrl = `${serverUrl}/jsapi/dh-core.js`;
-        console.log(`Loading DeepHaven OSS API from: ${apiUrl}`);
-        const dh = await import(/* webpackIgnore: true */ apiUrl);
-        api = dh.default || dh;
-        console.log('DeepHaven OSS API loaded successfully');
+        console.log('DeepHaven Enterprise API loaded from npm package');
       }
 
       (window as any).dh = api;
       return api;
     } catch (err) {
       console.error('Failed to load DeepHaven API:', err);
-      const source = isEnterprise ? '@deephaven-enterprise/jsapi package' : serverUrl;
-      throw new Error(`Failed to load DeepHaven API from ${source}. ${isEnterprise ? 'Check if the package is installed.' : 'Check if the server is accessible and CORS is enabled.'}`);
+      throw new Error(`Failed to load DeepHaven API from ${serverUrl}. Check if the server is accessible and CORS is enabled.`);
     }
   }
 
