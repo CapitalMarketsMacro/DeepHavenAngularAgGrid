@@ -271,9 +271,10 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
       case 'notEqual':
         return filterValue.notEq(target);
       case 'contains':
-        return filterValue.containsIgnoreCase(target);
+        // Use Java regex via invoke() to avoid DH containsIgnoreCase internal getLiteral bug
+        return filterValue.invoke('matches', this.dh.FilterValue.ofString(`(?i).*\\Q${value}\\E.*`));
       case 'notContains':
-        return filterValue.containsIgnoreCase(target).not();
+        return filterValue.invoke('matches', this.dh.FilterValue.ofString(`(?i).*\\Q${value}\\E.*`)).not();
       case 'startsWith':
         return filterValue.invoke('startsWith', this.dh.FilterValue.ofString(value));
       case 'endsWith':
