@@ -20,6 +20,9 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   private subscription: any = null;
   private cleanupFns: Array<() => void> = [];
 
+  // Resolved FilterValue class — may differ from dh.FilterValue on Enterprise
+  private _FV: any = null;
+
   constructor(dh: any, table: any) {
     this.dh = dh;
     this.table = table;
@@ -28,6 +31,84 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
     for (const col of this.columns) {
       this.columnMap.set(col.name, col);
     }
+  }
+
+  /**
+   * Resolve a FilterValue class that creates protobuf-compatible values.
+   * Enterprise DH's dh.FilterValue.ofString() may create FilterDescriptor objects
+   * that lack toArray(), causing errors in protobuf serialization.
+   * Fallback: derive the class from column.filter() which IS protobuf-compatible.
+   */
+  private resolveFilterValueClass(column?: any): any {
+    if (this._FV) return this._FV;
+
+    // Test standard dh.FilterValue
+    if (this.dh.FilterValue?.ofString) {
+      try {
+        const test = this.ofString('_test_');
+        if (typeof test?.toArray === 'function') {
+          this._FV = this.dh.FilterValue;
+          console.log('FilterValue: using dh.FilterValue (standard)');
+          return this._FV;
+        }
+        console.log('dh.FilterValue.ofString() lacks toArray, trying alternatives...');
+      } catch (e) {
+        console.log('dh.FilterValue.ofString() threw:', e);
+      }
+    }
+
+    // Enterprise fallback: column.filter() returns a protobuf FilterValue.
+    // Its constructor should have the same static factory methods.
+    const col = column || this.columns[0];
+    if (col) {
+      try {
+        const colFilter = col.filter();
+        const ctor = colFilter?.constructor;
+        console.log('column.filter() constructor:', ctor?.name,
+          'has ofString:', typeof ctor?.ofString,
+          'has ofNumber:', typeof ctor?.ofNumber);
+
+        if (typeof ctor?.ofString === 'function') {
+          const test = ctor.ofString('_test_');
+          if (typeof test?.toArray === 'function') {
+            this._FV = ctor;
+            console.log('FilterValue: using column.filter().constructor (Enterprise compat)');
+            return this._FV;
+          }
+        }
+      } catch (e) {
+        console.log('column.filter().constructor approach failed:', e);
+      }
+    }
+
+    // Last resort: log all available info for debugging
+    console.warn('No protobuf-compatible FilterValue found. Dumping diagnostics:');
+    console.log('dh keys:', Object.keys(this.dh));
+    if (this.dh.FilterValue) {
+      console.log('dh.FilterValue keys:', Object.keys(this.dh.FilterValue));
+      console.log('dh.FilterValue.prototype keys:', this.dh.FilterValue.prototype
+        ? Object.getOwnPropertyNames(this.dh.FilterValue.prototype) : 'no prototype');
+    }
+    if (col) {
+      const cf = col.filter();
+      console.log('column.filter() type:', typeof cf, 'keys:', Object.keys(cf));
+      console.log('column.filter().constructor:', cf?.constructor?.name);
+      console.log('column.filter().constructor keys:', cf?.constructor
+        ? Object.getOwnPropertyNames(cf.constructor) : 'none');
+    }
+
+    this._FV = this.dh.FilterValue;
+    return this._FV;
+  }
+
+  /** Create a string FilterValue using the resolved compatible class */
+  private ofString(value: string): any {
+    return this.resolveFilterValueClass().ofString(value);
+  }
+
+  /** Create a number FilterValue using the resolved compatible class */
+  private ofNumber(value: number | any): any {
+    return this.resolveFilterValueClass().ofNumber(value);
   }
 
   /**
@@ -173,9 +254,16 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         continue;
       }
 
-      const condition = this.buildFilterCondition(column, model);
-      if (condition) {
-        conditions.push(condition);
+      // Ensure FilterValue class is resolved before building conditions
+      this.resolveFilterValueClass(column);
+
+      try {
+        const condition = this.buildFilterCondition(column, model);
+        if (condition) {
+          conditions.push(condition);
+        }
+      } catch (err) {
+        console.error(`Failed to build filter for column ${colId}:`, err);
       }
     }
 
@@ -248,7 +336,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
    * contains() (not containsIgnoreCase), and invoke() for startsWith/endsWith.
    */
   private buildTextCondition(column: any, model: any): any {
-    const filterValue = this.dh.FilterValue.ofString(model.filter ?? '');
+    const filterValue = this.ofString(model.filter ?? '');
 
     switch (model.type) {
       case 'equals':
@@ -292,7 +380,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
     if (model.filter == null) return null;
 
-    const filterValue = this.dh.FilterValue.ofNumber(model.filter);
+    const filterValue = this.ofNumber(model.filter);
 
     switch (model.type) {
       case 'equals':
@@ -309,7 +397,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         return column.filter().lessThanOrEqualTo(filterValue);
       case 'inRange': {
         if (model.filterTo == null) return null;
-        const filterValueTo = this.dh.FilterValue.ofNumber(model.filterTo);
+        const filterValueTo = this.ofNumber(model.filterTo);
         return column.filter().greaterThan(filterValue)
           .and(column.filter().lessThan(filterValueTo));
       }
@@ -333,7 +421,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
     if (model.dateFrom == null) return null;
 
-    const filterValue = this.dh.FilterValue.ofNumber(
+    const filterValue = this.ofNumber(
       this.dh.DateWrapper.ofJsDate(new Date(model.dateFrom))
     );
 
@@ -348,7 +436,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         return column.filter().lessThan(filterValue);
       case 'inRange': {
         if (model.dateTo == null) return null;
-        const filterValueTo = this.dh.FilterValue.ofNumber(
+        const filterValueTo = this.ofNumber(
           this.dh.DateWrapper.ofJsDate(new Date(model.dateTo))
         );
         return column.filter().greaterThan(filterValue)
