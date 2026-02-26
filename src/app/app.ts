@@ -48,9 +48,8 @@ export class App implements OnInit, OnDestroy {
     const data = this.tableData();
     if (!data) return [];
 
-    // In viewport mode, use type-appropriate filters based on DH column types
-    const datasource = this.viewportDatasource();
-    const columnTypes = datasource ? datasource.getColumnTypes() : null;
+    // Use column types from the service (works for both client-side and viewport modes)
+    const columnTypes = this.deephavenService.columnTypes();
 
     return data.columns.map(col => {
       const def: ColDef = {
@@ -79,7 +78,8 @@ export class App implements OnInit, OnDestroy {
 
   readonly defaultColDef: ColDef = {
     flex: 1,
-    minWidth: 100
+    minWidth: 100,
+    floatingFilter: true
   };
 
   readonly theme = themeQuartz.withPart(colorSchemeDarkBlue);

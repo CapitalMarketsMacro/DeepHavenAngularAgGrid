@@ -32,6 +32,11 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
     }
   }
 
+  /** Access the DeepHaven API from the global namespace */
+  private get dh(): any {
+    return (window as any).dh;
+  }
+
   /**
    * Called by AG Grid to initialize the datasource
    */
@@ -99,6 +104,26 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   }
 
   /**
+   * Re-create subscription from row 0 after a sort/filter change.
+   * Uses the previous viewport size for the range, clamped to the new table size.
+   * ag-Grid will call setViewportRange() shortly after to adjust the range.
+   */
+  private resubscribeFromStart(): void {
+    const size = this.table.size;
+    if (size === 0) {
+      this.currentViewport = null;
+      return;
+    }
+
+    const prevSize = this.currentViewport
+      ? this.currentViewport.lastRow - this.currentViewport.firstRow
+      : 50;
+    const lastRow = Math.min(prevSize, size - 1);
+    this.currentViewport = { firstRow: 0, lastRow };
+    this.createSubscription(0, lastRow);
+  }
+
+  /**
    * Apply sorting to the DeepHaven table (synchronous, mutates in place)
    */
   applySort(sortModel: SortModelItem[]): void {
@@ -125,13 +150,17 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
     this.table.applySort(sorts);
     console.log('Sort applied:', sorts.length, 'columns');
 
-    // Update row count (may change if combined with filters)
+    // Close old subscription
+    if (this.subscription) {
+      this.subscription.close();
+      this.subscription = null;
+    }
+
+    // Update row count
     this.params.setRowCount(this.table.size);
 
-    // Re-create subscription to pick up the new sort order
-    if (this.currentViewport) {
-      this.createSubscription(this.currentViewport.firstRow, this.currentViewport.lastRow);
-    }
+    // Re-create subscription starting at row 0 with a safe range
+    this.resubscribeFromStart();
   }
 
   /**
@@ -160,13 +189,17 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
     this.table.applyFilter(conditions);
     console.log('Filter applied:', conditions.length, 'conditions');
 
-    // Update row count after filtering
+    // Close old subscription
+    if (this.subscription) {
+      this.subscription.close();
+      this.subscription = null;
+    }
+
+    // Update row count
     this.params.setRowCount(this.table.size);
 
-    // Re-create subscription to pick up filtered data
-    if (this.currentViewport) {
-      this.createSubscription(this.currentViewport.firstRow, this.currentViewport.lastRow);
-    }
+    // Re-create subscription starting at row 0 with a safe range
+    this.resubscribeFromStart();
   }
 
   /**
@@ -203,7 +236,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
     const filterType = model.filterType; // 'text', 'number', 'date'
     const type = model.type;             // 'contains', 'equals', 'greaterThan', etc.
 
-    // column.filter() returns a FilterValue builder
+    // column.filter() returns a FilterCondition builder (NOT FilterValue)
     const filterValue = column.filter();
 
     switch (filterType) {
@@ -211,6 +244,8 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         return this.buildTextCondition(filterValue, type, model.filter);
       case 'number':
         return this.buildNumberCondition(filterValue, type, model.filter, model.filterTo);
+      case 'date':
+        return this.buildDateCondition(filterValue, type, model.dateFrom, model.dateTo);
       default:
         console.warn(`Unsupported filter type: ${filterType}`);
         return null;
@@ -219,6 +254,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
   /**
    * Build a text filter condition
+   * FilterValue.ofString() is a static method on dh.FilterValue, not on the filter builder
    */
   private buildTextCondition(filterValue: any, type: string, value: string): any {
     if (value == null) {
@@ -227,7 +263,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
       return null;
     }
 
-    const target = filterValue.ofString(value);
+    const target = this.dh.FilterValue.ofString(value);
 
     switch (type) {
       case 'equals':
@@ -239,9 +275,9 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
       case 'notContains':
         return filterValue.containsIgnoreCase(target).not();
       case 'startsWith':
-        return filterValue.matches(`${value}.*`);
+        return filterValue.invoke('startsWith', this.dh.FilterValue.ofString(value));
       case 'endsWith':
-        return filterValue.matches(`.*${value}`);
+        return filterValue.invoke('endsWith', this.dh.FilterValue.ofString(value));
       case 'blank':
         return filterValue.isNull();
       case 'notBlank':
@@ -254,6 +290,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
   /**
    * Build a number filter condition
+   * FilterValue.ofNumber() is a static method on dh.FilterValue, not on the filter builder
    */
   private buildNumberCondition(
     filterValue: any,
@@ -266,7 +303,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
     if (value == null) return null;
 
-    const target = filterValue.ofNumber(value);
+    const target = this.dh.FilterValue.ofNumber(value);
 
     switch (type) {
       case 'equals':
@@ -283,10 +320,48 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         return filterValue.lessThanOrEqualTo(target);
       case 'inRange':
         if (valueTo == null) return null;
-        const targetTo = filterValue.ofNumber(valueTo);
+        const targetTo = this.dh.FilterValue.ofNumber(valueTo);
         return filterValue.greaterThanOrEqualTo(target).and(filterValue.lessThanOrEqualTo(targetTo));
       default:
         console.warn(`Unsupported number filter type: ${type}`);
+        return null;
+    }
+  }
+
+  /**
+   * Build a date filter condition
+   * Uses dh.DateWrapper.ofJsDate() to convert JS Date, then wraps in FilterValue.ofNumber()
+   */
+  private buildDateCondition(
+    filterValue: any,
+    type: string,
+    dateFrom?: string,
+    dateTo?: string
+  ): any {
+    if (type === 'blank') return filterValue.isNull();
+    if (type === 'notBlank') return filterValue.isNull().not();
+
+    if (dateFrom == null) return null;
+
+    const fromDate = new Date(dateFrom);
+    const target = this.dh.FilterValue.ofNumber(this.dh.DateWrapper.ofJsDate(fromDate));
+
+    switch (type) {
+      case 'equals':
+        return filterValue.eq(target);
+      case 'notEqual':
+        return filterValue.notEq(target);
+      case 'greaterThan':
+        return filterValue.greaterThan(target);
+      case 'lessThan':
+        return filterValue.lessThan(target);
+      case 'inRange':
+        if (dateTo == null) return null;
+        const toDate = new Date(dateTo);
+        const targetTo = this.dh.FilterValue.ofNumber(this.dh.DateWrapper.ofJsDate(toDate));
+        return filterValue.greaterThanOrEqualTo(target).and(filterValue.lessThanOrEqualTo(targetTo));
+      default:
+        console.warn(`Unsupported date filter type: ${type}`);
         return null;
     }
   }

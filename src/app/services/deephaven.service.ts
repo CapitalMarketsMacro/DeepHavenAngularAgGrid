@@ -39,6 +39,7 @@ export class DeephavenService {
   readonly tableData = signal<TableData | null>(null);
   readonly useViewport = signal(false);
   readonly viewportDatasource = signal<DeephavenViewportDatasource | null>(null);
+  readonly columnTypes = signal<Map<string, string> | null>(null);
 
   // Subject for emitting row transactions (add/update/remove)
   readonly transaction$ = new Subject<TableTransaction>();
@@ -84,6 +85,13 @@ export class DeephavenService {
       console.log('Fetching table:', config.tableName);
       this.table = await this.session.getTable(config.tableName);
       console.log('Table fetched:', this.table);
+
+      // Build column type map from table columns (works for both modes)
+      const types = new Map<string, string>();
+      for (const col of this.table.columns) {
+        types.set(col.name, col.type);
+      }
+      this.columnTypes.set(types);
 
       if (config.useViewport) {
         // Use Viewport Row Model - create datasource for AG Grid
@@ -356,6 +364,7 @@ export class DeephavenService {
     }
     this.isConnected.set(false);
     this.tableData.set(null);
+    this.columnTypes.set(null);
     this.rowDataMap.clear();
     this.rowKeyField = null;
     this.useViewport.set(false);
