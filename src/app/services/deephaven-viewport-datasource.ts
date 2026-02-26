@@ -166,7 +166,8 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
     const conditions: any[] = [];
 
     for (const [colId, model] of Object.entries(filterModel)) {
-      const column = this.columnMap.get(colId);
+      // Use table.findColumn() to match the official DH plugin
+      const column = this.table.findColumn(colId);
       if (!column) {
         console.warn(`Column not found for filtering: ${colId}`);
         continue;
@@ -270,7 +271,7 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
           .or(column.filter().eq(filterValue));
       case 'notBlank':
         return column.filter().isNull().not()
-          .and(column.filter().notEq(this.dh.FilterValue.ofString('')));
+          .and(column.filter().notEq(filterValue));
       default:
         console.warn(`Unsupported text filter type: ${model.type}`);
         return null;
