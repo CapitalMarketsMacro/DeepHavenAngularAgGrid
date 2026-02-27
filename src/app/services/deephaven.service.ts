@@ -62,9 +62,22 @@ export class DeephavenService {
       const dh = await this.loadDeephavenApi(config.serverUrl, config.isEnterprise);
       console.log('DeepHaven API loaded:', dh);
 
-      // Create client — Enterprise uses dh.Client (IrisClient), OSS uses dh.CoreClient
-      if (config.isEnterprise) {
-        // IrisClient needs a WebSocket URL with /socket path
+      // Create client — try CoreClient first (works on both OSS and some Enterprise),
+      // fall back to IrisClient (dh.Client) if CoreClient is unavailable
+      if (dh.CoreClient) {
+        this.client = new dh.CoreClient(config.serverUrl);
+        console.log('CoreClient created');
+
+        await this.client.login({
+          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
+          token: config.authToken
+        });
+        console.log('Login successful');
+
+        this.session = await this.client.getAsIdeConnection();
+        console.log('IDE Connection obtained:', this.session);
+      } else {
+        // Enterprise Iris Client: needs WebSocket URL with /socket path
         const wsUrl = config.serverUrl
           .replace(/^http:/, 'ws:')
           .replace(/^https:/, 'wss:')
@@ -80,30 +93,16 @@ export class DeephavenService {
             console.log('Iris Client connected');
             resolve();
           });
-          this.client.addEventListener('disconnect', () => {
-            clearTimeout(timeout);
-            reject(new Error('Iris Client disconnected during setup'));
-          });
         });
 
         await this.client.login({
-          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
+          type: 'password',
           token: config.authToken
         });
         console.log('Login successful');
 
-        // Enterprise: get IDE session via dh.Ide(client)
         this.session = new dh.Ide(this.client);
         console.log('IDE session obtained via dh.Ide:', this.session);
-      } else {
-        this.client = new dh.CoreClient(config.serverUrl);
-        console.log('Core+ Client created');
-
-        await this.client.login({
-          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
-          token: config.authToken
-        });
-        console.log('Login successful');
 
         // OSS: get IDE connection from CoreClient
         this.session = await this.client.getAsIdeConnection();
@@ -236,20 +235,18 @@ export class DeephavenService {
       let client: any;
       let session: any;
 
-      if (isEnterprise) {
-        client = new dh.Client(serverUrl);
-        await client.login({
-          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
-          token: authToken
-        });
-        session = new dh.Ide(client);
-      } else {
+      if (dh.CoreClient) {
         client = new dh.CoreClient(serverUrl);
         await client.login({
           type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
           token: authToken
         });
         session = await client.getAsIdeConnection();
+      } else {
+        const wsUrl = serverUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:').replace(/\/$/, '') + '/socket';
+        client = new dh.Client(wsUrl);
+        await client.login({ type: 'password', token: authToken });
+        session = new dh.Ide(client);
       }
 
       if (!session) {
