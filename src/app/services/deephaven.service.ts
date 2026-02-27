@@ -58,70 +58,62 @@ export class DeephavenService {
     this.useViewport.set(config.useViewport ?? false);
 
     try {
+      // Strip fragment identifiers from URL (breaks WebSocket construction)
+      const serverUrl = config.serverUrl.replace(/#.*$/, '').replace(/\/$/, '');
+
       // Dynamically import DeepHaven API (OSS or Enterprise)
-      const dh = await this.loadDeephavenApi(config.serverUrl, config.isEnterprise);
+      const dh = await this.loadDeephavenApi(serverUrl, config.isEnterprise);
       console.log('DeepHaven API loaded:', dh);
 
-      // Create client — try CoreClient first (works on both OSS and some Enterprise),
-      // fall back to IrisClient (dh.Client) if CoreClient is unavailable
-      if (dh.CoreClient) {
-        this.client = new dh.CoreClient(config.serverUrl);
-        console.log('CoreClient created');
+      // Create client and login
+      const ClientClass = dh.CoreClient || dh.Client;
+      this.client = new ClientClass(serverUrl);
+      console.log('Client created:', ClientClass.name || 'unknown');
 
-        await this.client.login({
-          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
-          token: config.authToken
-        });
-        console.log('Login successful');
+      await this.client.login({
+        type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
+        token: config.authToken
+      });
+      console.log('Login successful');
 
-        // getAsIdeConnection is Core+ only; Enterprise CoreClient may be an IrisClient alias
-        if (typeof this.client.getAsIdeConnection === 'function') {
-          this.session = await this.client.getAsIdeConnection();
-          console.log('IDE Connection obtained via getAsIdeConnection');
-        } else {
-          this.session = new dh.Ide(this.client);
-          console.log('IDE session obtained via dh.Ide');
-        }
-      } else {
-        // Enterprise Iris Client: needs WebSocket URL with /socket path
-        const wsUrl = config.serverUrl
-          .replace(/^http:/, 'ws:')
-          .replace(/^https:/, 'wss:')
-          .replace(/\/$/, '') + '/socket';
-        console.log('Connecting Iris Client to:', wsUrl);
-        this.client = new dh.Client(wsUrl);
-
-        // Wait for WebSocket to open before login
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Iris Client connection timeout (10s)')), 10000);
-          this.client.addEventListener('connect', () => {
-            clearTimeout(timeout);
-            console.log('Iris Client connected');
-            resolve();
-          });
-        });
-
-        await this.client.login({
-          type: 'password',
-          token: config.authToken
-        });
-        console.log('Login successful');
-
-        this.session = new dh.Ide(this.client);
-        console.log('IDE session obtained via dh.Ide:', this.session);
-
-        // OSS: get IDE connection from CoreClient
+      // Get session: try getAsIdeConnection (Core+), fall back to dh.Ide (Enterprise Iris)
+      if (typeof this.client.getAsIdeConnection === 'function') {
         this.session = await this.client.getAsIdeConnection();
-        console.log('IDE Connection obtained:', this.session);
-      }
-
-      if (!this.session) {
-        throw new Error('Failed to get IDE connection after login');
+        console.log('IDE Connection obtained via getAsIdeConnection');
+      } else if (dh.Ide) {
+        this.session = new dh.Ide(this.client);
+        console.log('IDE session obtained via dh.Ide');
       }
 
       // Get the table
-      console.log('Fetching table:', config.tableName);
-      this.table = await this.session.getTable(config.tableName);
+      if (this.session && typeof this.session.getTable === 'function') {
+        // OSS / Core+ path: session has getTable
+        console.log('Fetching table via session.getTable:', config.tableName);
+        this.table = await this.session.getTable(config.tableName);
+      } else {
+        // Enterprise Iris path: use getKnownConfigs → designated.getTable()
+        console.log('Fetching table via getKnownConfigs:', config.tableName);
+        const configs = await this.client.getKnownConfigs();
+        console.log('Known configs:', configs);
+
+        // Find matching config by name
+        let tableConfig: any = null;
+        for (const cfg of configs) {
+          if (cfg.name === config.tableName || cfg.designated?.name === config.tableName) {
+            tableConfig = cfg;
+            break;
+          }
+        }
+
+        if (!tableConfig) {
+          // If no exact match, list available configs for debugging
+          const names = configs.map((c: any) => c.name || 'unnamed').join(', ');
+          throw new Error(`Table "${config.tableName}" not found in configs. Available: ${names}`);
+        }
+
+        console.log('Found table config:', tableConfig);
+        this.table = await tableConfig.designated.getTable();
+      }
       console.log('Table fetched:', this.table);
 
       // Build column type map from table columns (works for both modes)
