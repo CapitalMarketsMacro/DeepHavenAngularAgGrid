@@ -20,10 +20,13 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   private subscription: any = null;
   private cleanupFns: Array<() => void> = [];
 
-  // Enterprise mode: pass raw JS values to filter methods instead of FilterValue wrappers.
-  // Enterprise DH docs show: column.filter().eq("A") — raw strings, no FilterValue wrapper.
-  // OSS DH requires: column.filter().eq(dh.FilterValue.ofString("A")).
-  private _useRawValues: boolean | null = null;
+  /**
+   * Resolved FilterValue factory function.
+   * OSS: uses dh.FilterValue.ofString/ofNumber (protobuf-compatible).
+   * Enterprise: auto-detected from column.filter().constructor or dh.FilterValue.
+   */
+  private _makeStringValue: ((v: string) => any) | null = null;
+  private _makeNumberValue: ((v: number | any) => any) | null = null;
 
   constructor(dh: any, table: any) {
     this.dh = dh;
@@ -36,38 +39,92 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   }
 
   /**
-   * Detect whether to use raw JS values (Enterprise) or FilterValue wrappers (OSS).
-   * Enterprise's dh.FilterValue.ofString() creates FilterDescriptor objects that
-   * are incompatible with the protobuf-based column.filter().eq(). The Enterprise
-   * docs show raw values passed directly: column.filter().eq("A").
+   * One-time detection of how to create filter values.
+   * Tries multiple approaches in order until one produces a value
+   * compatible with column.filter().eq().
    */
-  private useRawValues(): boolean {
-    if (this._useRawValues !== null) return this._useRawValues;
+  private detectFilterValueFactory(column: any): void {
+    if (this._makeStringValue) return; // already resolved
 
+    // Log diagnostic info for debugging
+    console.log('=== FilterValue Detection ===');
+
+    // Approach 1: Standard dh.FilterValue (works on OSS)
     if (this.dh.FilterValue?.ofString) {
       try {
         const test = this.dh.FilterValue.ofString('_test_');
+        console.log('dh.FilterValue.ofString result:', typeof test,
+          'toArray:', typeof test?.toArray,
+          'descriptor:', typeof test?.descriptor,
+          'keys:', test ? Object.keys(test) : 'null');
+
         if (typeof test?.toArray === 'function') {
-          this._useRawValues = false;
-          console.log('Filter mode: OSS (using FilterValue wrappers)');
-          return false;
+          this._makeStringValue = (v: string) => this.dh.FilterValue.ofString(v);
+          this._makeNumberValue = (v: any) => this.dh.FilterValue.ofNumber(v);
+          console.log('FilterValue: using dh.FilterValue (OSS/standard)');
+          return;
         }
-      } catch (_) { /* fall through */ }
+      } catch (e) {
+        console.log('dh.FilterValue.ofString threw:', e);
+      }
     }
 
-    this._useRawValues = true;
-    console.log('Filter mode: Enterprise (using raw JS values)');
-    return true;
+    // Approach 2: Derive from column.filter().constructor (Core+ protobuf class)
+    try {
+      const colFilter = column.filter();
+      const ctor = colFilter?.constructor;
+      console.log('column.filter() result:', typeof colFilter,
+        'constructor:', ctor?.name,
+        'ctor keys:', ctor ? Object.getOwnPropertyNames(ctor).join(',') : 'none');
+      console.log('column.filter() keys:', colFilter ? Object.keys(colFilter) : 'none');
+      console.log('column.filter() proto keys:', colFilter
+        ? Object.getOwnPropertyNames(Object.getPrototypeOf(colFilter)).join(',') : 'none');
+
+      if (typeof ctor?.ofString === 'function') {
+        const test = ctor.ofString('_test_');
+        console.log('constructor.ofString result:', typeof test,
+          'toArray:', typeof test?.toArray,
+          'descriptor:', typeof test?.descriptor);
+        this._makeStringValue = (v: string) => ctor.ofString(v);
+        this._makeNumberValue = (v: any) => ctor.ofNumber(v);
+        console.log('FilterValue: using column.filter().constructor');
+        return;
+      }
+    } catch (e) {
+      console.log('column.filter().constructor approach failed:', e);
+    }
+
+    // Approach 3: Try dh.FilterValue but pass through (Enterprise Iris API style)
+    // Enterprise Iris docs show: column.filter().eqIgnoreCase("FOO")
+    // The Iris API may accept raw values OR dh.FilterValue descriptors
+    console.log('Approach 3: will use dh.FilterValue.ofString (Enterprise descriptor)');
+    if (this.dh.FilterValue?.ofString) {
+      this._makeStringValue = (v: string) => this.dh.FilterValue.ofString(v);
+      this._makeNumberValue = (v: any) => this.dh.FilterValue.ofNumber(v);
+      console.log('FilterValue: using dh.FilterValue (Enterprise descriptor)');
+      return;
+    }
+
+    // Approach 4: Raw values as last resort
+    console.warn('No FilterValue factory found, using raw values');
+    this._makeStringValue = (v: string) => v;
+    this._makeNumberValue = (v: any) => v;
+
+    // Dump full diagnostic info
+    console.log('dh keys:', Object.keys(this.dh));
+    console.log('dh.FilterValue:', this.dh.FilterValue);
+    console.log('dh.FilterCondition:', this.dh.FilterCondition,
+      'keys:', this.dh.FilterCondition ? Object.keys(this.dh.FilterCondition) : 'none');
   }
 
-  /** Create a string filter value — raw string for Enterprise, FilterValue for OSS */
+  /** Create a string filter value using the detected factory */
   private ofString(value: string): any {
-    return this.useRawValues() ? value : this.dh.FilterValue.ofString(value);
+    return this._makeStringValue!(value);
   }
 
-  /** Create a number filter value — raw number for Enterprise, FilterValue for OSS */
+  /** Create a number filter value using the detected factory */
   private ofNumber(value: number | any): any {
-    return this.useRawValues() ? value : this.dh.FilterValue.ofNumber(value);
+    return this._makeNumberValue!(value);
   }
 
   /**
@@ -212,6 +269,9 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         console.warn(`Column not found for filtering: ${colId}`);
         continue;
       }
+
+      // One-time: detect how to create filter values for this API
+      this.detectFilterValueFactory(column);
 
       try {
         const condition = this.buildFilterCondition(column, model);
