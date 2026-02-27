@@ -51,6 +51,47 @@ export class DeephavenService {
   private rowDataMap = new Map<string, any>();
 
   private client: any = null;
+  private originalWebSocket: typeof WebSocket | null = null;
+
+  /**
+   * Patch the global WebSocket constructor to strip fragment identifiers from URLs.
+   * The DH Enterprise GWT API internally constructs WebSocket URLs with fragments
+   * (e.g. #/?checksum=...) which browsers reject. This intercepts all WebSocket
+   * creation and removes fragments before connecting.
+   */
+  private patchWebSocket(): void {
+    if (this.originalWebSocket) return; // already patched
+
+    const OrigWS = window.WebSocket;
+    this.originalWebSocket = OrigWS;
+
+    const PatchedWS = function (this: WebSocket, url: string | URL, protocols?: string | string[]) {
+      const cleanUrl = String(url).replace(/#.*$/, '');
+      if (cleanUrl !== String(url)) {
+        console.log('WebSocket: stripped fragment from URL');
+      }
+      if (protocols !== undefined) {
+        return new OrigWS(cleanUrl, protocols);
+      }
+      return new OrigWS(cleanUrl);
+    } as unknown as typeof WebSocket;
+
+    PatchedWS.prototype = OrigWS.prototype;
+    // Copy static constants — use defineProperty to bypass TS readonly
+    for (const key of ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'] as const) {
+      Object.defineProperty(PatchedWS, key, { value: OrigWS[key] });
+    }
+
+    (window as any).WebSocket = PatchedWS;
+  }
+
+  /** Restore the original WebSocket constructor */
+  private unpatchWebSocket(): void {
+    if (this.originalWebSocket) {
+      window.WebSocket = this.originalWebSocket;
+      this.originalWebSocket = null;
+    }
+  }
 
   async connect(config: ConnectionConfig): Promise<void> {
     this.isLoading.set(true);
@@ -60,6 +101,11 @@ export class DeephavenService {
     try {
       // Strip fragment identifiers from URL (breaks WebSocket construction)
       const serverUrl = config.serverUrl.replace(/#.*$/, '').replace(/\/$/, '');
+
+      // Patch WebSocket to strip fragments from internal DH API calls
+      if (config.isEnterprise) {
+        this.patchWebSocket();
+      }
 
       // Dynamically import DeepHaven API (OSS or Enterprise)
       const dh = await this.loadDeephavenApi(serverUrl, config.isEnterprise);
