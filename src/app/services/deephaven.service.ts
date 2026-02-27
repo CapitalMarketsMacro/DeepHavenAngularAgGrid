@@ -74,8 +74,14 @@ export class DeephavenService {
         });
         console.log('Login successful');
 
-        this.session = await this.client.getAsIdeConnection();
-        console.log('IDE Connection obtained:', this.session);
+        // getAsIdeConnection is Core+ only; Enterprise CoreClient may be an IrisClient alias
+        if (typeof this.client.getAsIdeConnection === 'function') {
+          this.session = await this.client.getAsIdeConnection();
+          console.log('IDE Connection obtained via getAsIdeConnection');
+        } else {
+          this.session = new dh.Ide(this.client);
+          console.log('IDE session obtained via dh.Ide');
+        }
       } else {
         // Enterprise Iris Client: needs WebSocket URL with /socket path
         const wsUrl = config.serverUrl
