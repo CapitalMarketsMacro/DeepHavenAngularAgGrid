@@ -64,8 +64,27 @@ export class DeephavenService {
 
       // Create client — Enterprise uses dh.Client (IrisClient), OSS uses dh.CoreClient
       if (config.isEnterprise) {
-        this.client = new dh.Client(config.serverUrl);
-        console.log('Iris Client created');
+        // IrisClient needs a WebSocket URL with /socket path
+        const wsUrl = config.serverUrl
+          .replace(/^http:/, 'ws:')
+          .replace(/^https:/, 'wss:')
+          .replace(/\/$/, '') + '/socket';
+        console.log('Connecting Iris Client to:', wsUrl);
+        this.client = new dh.Client(wsUrl);
+
+        // Wait for WebSocket to open before login
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Iris Client connection timeout (10s)')), 10000);
+          this.client.addEventListener('connect', () => {
+            clearTimeout(timeout);
+            console.log('Iris Client connected');
+            resolve();
+          });
+          this.client.addEventListener('disconnect', () => {
+            clearTimeout(timeout);
+            reject(new Error('Iris Client disconnected during setup'));
+          });
+        });
 
         await this.client.login({
           type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
