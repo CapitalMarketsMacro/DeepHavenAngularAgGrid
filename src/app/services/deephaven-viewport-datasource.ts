@@ -20,13 +20,9 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   private subscription: any = null;
   private cleanupFns: Array<() => void> = [];
 
-  /**
-   * Resolved FilterValue factory function.
-   * OSS: uses dh.FilterValue.ofString/ofNumber (protobuf-compatible).
-   * Enterprise: auto-detected from column.filter().constructor or dh.FilterValue.
-   */
-  private _makeStringValue: ((v: string) => any) | null = null;
-  private _makeNumberValue: ((v: number | any) => any) | null = null;
+  // true = Enterprise Iris API (uses dh.FilterValue descriptors + Iris filter methods)
+  // false = OSS Core+ API (uses protobuf FilterValues)
+  private _isIris: boolean | null = null;
 
   constructor(dh: any, table: any) {
     this.dh = dh;
@@ -39,144 +35,36 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
   }
 
   /**
-   * One-time detection of how to create filter values.
-   * Tries multiple approaches in order until one produces a value
-   * compatible with column.filter().eq().
-   *
-   * The Core+ API (dh-core.js) expects FilterValue arguments to have a
-   * `descriptor` that is a protobuf Value message (with getLiteral/getReference).
-   * Enterprise's dh.FilterValue.ofString() may create a descriptor that is NOT
-   * a protobuf Value, causing getLiteral errors. In that case we construct
-   * a compatible FilterValue by cloning the column.filter() object structure
-   * and replacing the descriptor with a proper Literal-based Value.
+   * Detect API mode. OSS uses Core+ with protobuf FilterValues (have toArray).
+   * Enterprise uses Iris Client with its own FilterValue descriptors.
    */
-  private detectFilterValueFactory(column: any): void {
-    if (this._makeStringValue) return; // already resolved
+  private isIris(): boolean {
+    if (this._isIris !== null) return this._isIris;
 
-    console.log('=== FilterValue Detection ===');
-
-    // Approach 1: Standard dh.FilterValue (works on OSS)
     if (this.dh.FilterValue?.ofString) {
       try {
         const test = this.dh.FilterValue.ofString('_test_');
         if (typeof test?.toArray === 'function') {
-          this._makeStringValue = (v: string) => this.dh.FilterValue.ofString(v);
-          this._makeNumberValue = (v: any) => this.dh.FilterValue.ofNumber(v);
-          console.log('FilterValue: using dh.FilterValue (OSS/standard)');
-          return;
+          this._isIris = false;
+          console.log('Filter mode: OSS/Core+ (protobuf FilterValues)');
+          return false;
         }
-      } catch (e) { /* fall through */ }
+      } catch (_) { /* fall through */ }
     }
 
-    // Enterprise: inspect the protobuf descriptor from column.filter()
-    // to learn how to construct proper Literal values
-    const colFilter = column.filter();
-    const colDesc = colFilter?.descriptor;
-
-    console.log('=== Descriptor Analysis ===');
-    console.log('column.filter().descriptor:', colDesc);
-    console.log('descriptor constructor:', colDesc?.constructor?.name);
-    console.log('descriptor own keys:', colDesc ? Object.keys(colDesc) : 'none');
-    const descProto = colDesc ? Object.getPrototypeOf(colDesc) : null;
-    console.log('descriptor proto methods:', descProto
-      ? Object.getOwnPropertyNames(descProto).join(', ') : 'none');
-    console.log('has getLiteral:', typeof colDesc?.getLiteral);
-    console.log('has getReference:', typeof colDesc?.getReference);
-    console.log('has setLiteral:', typeof colDesc?.setLiteral);
-
-    // Check what the Iris FilterValue.ofString descriptor looks like
-    if (this.dh.FilterValue?.ofString) {
-      const irisVal = this.dh.FilterValue.ofString('_test_');
-      const irisDesc = irisVal?.descriptor;
-      console.log('iris descriptor:', irisDesc);
-      console.log('iris descriptor constructor:', irisDesc?.constructor?.name);
-      console.log('iris descriptor own keys:', irisDesc ? Object.keys(irisDesc) : 'none');
-      const irisProto = irisDesc ? Object.getPrototypeOf(irisDesc) : null;
-      console.log('iris descriptor proto methods:', irisProto
-        ? Object.getOwnPropertyNames(irisProto).join(', ') : 'none');
-      console.log('iris has getLiteral:', typeof irisDesc?.getLiteral);
-    }
-
-    // Approach 2: If column descriptor has getLiteral, we can construct compatible values
-    // by cloning the FilterValue prototype and building a proper protobuf descriptor
-    if (typeof colDesc?.getLiteral === 'function' && typeof colDesc?.getReference === 'function') {
-      console.log('Column descriptor IS a protobuf Value — attempting to build Literal values');
-
-      // Get the protobuf Value class from the column descriptor
-      const DescriptorClass = colDesc.constructor;
-      // Get the FilterValue prototype (has eq, contains, etc.)
-      const filterValueProto = Object.getPrototypeOf(colFilter);
-
-      // Try to find a Literal class by inspecting what getReference returns
-      const ref = colDesc.getReference();
-      console.log('getReference() result:', ref, 'type:', typeof ref);
-      if (ref) {
-        console.log('reference constructor:', ref.constructor?.name);
-        console.log('reference proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(ref)).join(', '));
-      }
-
-      // Try to find Literal by calling getLiteral on a fresh descriptor
-      try {
-        const freshDesc = new DescriptorClass();
-        console.log('new DescriptorClass():', freshDesc);
-        console.log('fresh keys:', Object.keys(freshDesc));
-        console.log('fresh proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(freshDesc)).join(', '));
-        console.log('fresh has setLiteral:', typeof freshDesc.setLiteral);
-        console.log('fresh has setStringValue:', typeof freshDesc.setStringValue);
-
-        // If the Value proto itself can hold a string (simplified proto), try setting directly
-        if (typeof freshDesc.setStringValue === 'function') {
-          console.log('Descriptor has setStringValue — using direct value construction');
-          this._makeStringValue = (v: string) => {
-            const desc = new DescriptorClass();
-            desc.setStringValue(v);
-            const fv = Object.create(filterValueProto);
-            fv.descriptor = desc;
-            return fv;
-          };
-          this._makeNumberValue = (v: any) => {
-            const desc = new DescriptorClass();
-            desc.setDoubleValue(typeof v === 'number' ? v : Number(v));
-            const fv = Object.create(filterValueProto);
-            fv.descriptor = desc;
-            return fv;
-          };
-          console.log('FilterValue: using manual protobuf construction (setStringValue)');
-          return;
-        }
-
-        // If has setLiteral, we need to create a Literal first
-        if (typeof freshDesc.setLiteral === 'function') {
-          console.log('Descriptor has setLiteral — looking for Literal class');
-          // The Literal class might be derivable from another call
-        }
-      } catch (e) {
-        console.log('DescriptorClass construction failed:', e);
-      }
-    }
-
-    // Approach 3: Use dh.FilterValue.ofString and hope eq/contains can handle it
-    if (this.dh.FilterValue?.ofString) {
-      this._makeStringValue = (v: string) => this.dh.FilterValue.ofString(v);
-      this._makeNumberValue = (v: any) => this.dh.FilterValue.ofNumber(v);
-      console.log('FilterValue: using dh.FilterValue (Enterprise - may not work)');
-      return;
-    }
-
-    // Approach 4: Raw values
-    console.warn('No FilterValue factory found, using raw values');
-    this._makeStringValue = (v: string) => v;
-    this._makeNumberValue = (v: any) => v;
+    this._isIris = true;
+    console.log('Filter mode: Enterprise/Iris (using Iris filter methods)');
+    return true;
   }
 
-  /** Create a string filter value using the detected factory */
+  /** Create a string FilterValue */
   private ofString(value: string): any {
-    return this._makeStringValue!(value);
+    return this.dh.FilterValue.ofString(value);
   }
 
-  /** Create a number filter value using the detected factory */
+  /** Create a number FilterValue */
   private ofNumber(value: number | any): any {
-    return this._makeNumberValue!(value);
+    return this.dh.FilterValue.ofNumber(value);
   }
 
   /**
@@ -322,9 +210,6 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
         continue;
       }
 
-      // One-time: detect how to create filter values for this API
-      this.detectFilterValueFactory(column);
-
       try {
         const condition = this.buildFilterCondition(column, model);
         if (condition) {
@@ -400,34 +285,51 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
   /**
    * Build a text filter condition.
-   * Matches the official DH AG Grid plugin: uses dh.FilterValue.ofString() (static),
-   * contains() (not containsIgnoreCase), and invoke() for startsWith/endsWith.
+   * OSS (Core+): uses protobuf FilterValues with contains(), eq(), invoke().
+   * Enterprise (Iris): uses Iris FilterValue descriptors with containsIgnoreCase(),
+   * eqIgnoreCase() — these are Iris-native methods that handle Iris descriptors.
+   * The Core+ methods (contains, eq) call $makeContains in dh-core.js which
+   * expects protobuf Values with getLiteral(), but Iris descriptors don't have that.
    */
   private buildTextCondition(column: any, model: any): any {
     const filterValue = this.ofString(model.filter ?? '');
+    const iris = this.isIris();
 
     switch (model.type) {
       case 'equals':
-        return column.filter().eq(filterValue);
+        return iris
+          ? column.filter().eqIgnoreCase(filterValue)
+          : column.filter().eq(filterValue);
       case 'notEqual':
-        return column.filter().notEq(filterValue);
+        return iris
+          ? column.filter().notEqIgnoreCase(filterValue)
+          : column.filter().notEq(filterValue);
       case 'contains':
-        return column.filter().contains(filterValue);
+        return iris
+          ? column.filter().containsIgnoreCase(filterValue)
+          : column.filter().contains(filterValue);
       case 'notContains':
-        return column.filter().isNull()
-          .or(column.filter().contains(filterValue).not());
+        return iris
+          ? column.filter().isNull()
+              .or(column.filter().containsIgnoreCase(filterValue).not())
+          : column.filter().isNull()
+              .or(column.filter().contains(filterValue).not());
       case 'startsWith':
-        return column.filter().isNull().not()
-          .and(column.filter().invoke('startsWith', filterValue));
+        return column.filter().invoke('startsWith', filterValue);
       case 'endsWith':
-        return column.filter().isNull().not()
-          .and(column.filter().invoke('endsWith', filterValue));
+        return column.filter().invoke('endsWith', filterValue);
       case 'blank':
-        return column.filter().isNull()
-          .or(column.filter().eq(filterValue));
+        return iris
+          ? column.filter().isNull()
+              .or(column.filter().eqIgnoreCase(this.ofString('')))
+          : column.filter().isNull()
+              .or(column.filter().eq(this.ofString('')));
       case 'notBlank':
-        return column.filter().isNull().not()
-          .and(column.filter().notEq(filterValue));
+        return iris
+          ? column.filter().isNull().not()
+              .and(column.filter().notEqIgnoreCase(this.ofString('')))
+          : column.filter().isNull().not()
+              .and(column.filter().notEq(this.ofString('')));
       default:
         console.warn(`Unsupported text filter type: ${model.type}`);
         return null;
@@ -436,7 +338,9 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
 
   /**
    * Build a number filter condition.
-   * Matches the official DH AG Grid plugin.
+   * Number columns use eq/greaterThan/lessThan which go through Core+ code paths.
+   * On Iris, try eqIgnoreCase for equals (Iris-native), fall back to eq for others
+   * since greaterThan/lessThan may not have Iris-specific variants.
    */
   private buildNumberCondition(column: any, model: any): any {
     switch (model.type) {
