@@ -42,79 +42,131 @@ export class DeephavenViewportDatasource implements IViewportDatasource {
    * One-time detection of how to create filter values.
    * Tries multiple approaches in order until one produces a value
    * compatible with column.filter().eq().
+   *
+   * The Core+ API (dh-core.js) expects FilterValue arguments to have a
+   * `descriptor` that is a protobuf Value message (with getLiteral/getReference).
+   * Enterprise's dh.FilterValue.ofString() may create a descriptor that is NOT
+   * a protobuf Value, causing getLiteral errors. In that case we construct
+   * a compatible FilterValue by cloning the column.filter() object structure
+   * and replacing the descriptor with a proper Literal-based Value.
    */
   private detectFilterValueFactory(column: any): void {
     if (this._makeStringValue) return; // already resolved
 
-    // Log diagnostic info for debugging
     console.log('=== FilterValue Detection ===');
 
     // Approach 1: Standard dh.FilterValue (works on OSS)
     if (this.dh.FilterValue?.ofString) {
       try {
         const test = this.dh.FilterValue.ofString('_test_');
-        console.log('dh.FilterValue.ofString result:', typeof test,
-          'toArray:', typeof test?.toArray,
-          'descriptor:', typeof test?.descriptor,
-          'keys:', test ? Object.keys(test) : 'null');
-
         if (typeof test?.toArray === 'function') {
           this._makeStringValue = (v: string) => this.dh.FilterValue.ofString(v);
           this._makeNumberValue = (v: any) => this.dh.FilterValue.ofNumber(v);
           console.log('FilterValue: using dh.FilterValue (OSS/standard)');
           return;
         }
+      } catch (e) { /* fall through */ }
+    }
+
+    // Enterprise: inspect the protobuf descriptor from column.filter()
+    // to learn how to construct proper Literal values
+    const colFilter = column.filter();
+    const colDesc = colFilter?.descriptor;
+
+    console.log('=== Descriptor Analysis ===');
+    console.log('column.filter().descriptor:', colDesc);
+    console.log('descriptor constructor:', colDesc?.constructor?.name);
+    console.log('descriptor own keys:', colDesc ? Object.keys(colDesc) : 'none');
+    const descProto = colDesc ? Object.getPrototypeOf(colDesc) : null;
+    console.log('descriptor proto methods:', descProto
+      ? Object.getOwnPropertyNames(descProto).join(', ') : 'none');
+    console.log('has getLiteral:', typeof colDesc?.getLiteral);
+    console.log('has getReference:', typeof colDesc?.getReference);
+    console.log('has setLiteral:', typeof colDesc?.setLiteral);
+
+    // Check what the Iris FilterValue.ofString descriptor looks like
+    if (this.dh.FilterValue?.ofString) {
+      const irisVal = this.dh.FilterValue.ofString('_test_');
+      const irisDesc = irisVal?.descriptor;
+      console.log('iris descriptor:', irisDesc);
+      console.log('iris descriptor constructor:', irisDesc?.constructor?.name);
+      console.log('iris descriptor own keys:', irisDesc ? Object.keys(irisDesc) : 'none');
+      const irisProto = irisDesc ? Object.getPrototypeOf(irisDesc) : null;
+      console.log('iris descriptor proto methods:', irisProto
+        ? Object.getOwnPropertyNames(irisProto).join(', ') : 'none');
+      console.log('iris has getLiteral:', typeof irisDesc?.getLiteral);
+    }
+
+    // Approach 2: If column descriptor has getLiteral, we can construct compatible values
+    // by cloning the FilterValue prototype and building a proper protobuf descriptor
+    if (typeof colDesc?.getLiteral === 'function' && typeof colDesc?.getReference === 'function') {
+      console.log('Column descriptor IS a protobuf Value — attempting to build Literal values');
+
+      // Get the protobuf Value class from the column descriptor
+      const DescriptorClass = colDesc.constructor;
+      // Get the FilterValue prototype (has eq, contains, etc.)
+      const filterValueProto = Object.getPrototypeOf(colFilter);
+
+      // Try to find a Literal class by inspecting what getReference returns
+      const ref = colDesc.getReference();
+      console.log('getReference() result:', ref, 'type:', typeof ref);
+      if (ref) {
+        console.log('reference constructor:', ref.constructor?.name);
+        console.log('reference proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(ref)).join(', '));
+      }
+
+      // Try to find Literal by calling getLiteral on a fresh descriptor
+      try {
+        const freshDesc = new DescriptorClass();
+        console.log('new DescriptorClass():', freshDesc);
+        console.log('fresh keys:', Object.keys(freshDesc));
+        console.log('fresh proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(freshDesc)).join(', '));
+        console.log('fresh has setLiteral:', typeof freshDesc.setLiteral);
+        console.log('fresh has setStringValue:', typeof freshDesc.setStringValue);
+
+        // If the Value proto itself can hold a string (simplified proto), try setting directly
+        if (typeof freshDesc.setStringValue === 'function') {
+          console.log('Descriptor has setStringValue — using direct value construction');
+          this._makeStringValue = (v: string) => {
+            const desc = new DescriptorClass();
+            desc.setStringValue(v);
+            const fv = Object.create(filterValueProto);
+            fv.descriptor = desc;
+            return fv;
+          };
+          this._makeNumberValue = (v: any) => {
+            const desc = new DescriptorClass();
+            desc.setDoubleValue(typeof v === 'number' ? v : Number(v));
+            const fv = Object.create(filterValueProto);
+            fv.descriptor = desc;
+            return fv;
+          };
+          console.log('FilterValue: using manual protobuf construction (setStringValue)');
+          return;
+        }
+
+        // If has setLiteral, we need to create a Literal first
+        if (typeof freshDesc.setLiteral === 'function') {
+          console.log('Descriptor has setLiteral — looking for Literal class');
+          // The Literal class might be derivable from another call
+        }
       } catch (e) {
-        console.log('dh.FilterValue.ofString threw:', e);
+        console.log('DescriptorClass construction failed:', e);
       }
     }
 
-    // Approach 2: Derive from column.filter().constructor (Core+ protobuf class)
-    try {
-      const colFilter = column.filter();
-      const ctor = colFilter?.constructor;
-      console.log('column.filter() result:', typeof colFilter,
-        'constructor:', ctor?.name,
-        'ctor keys:', ctor ? Object.getOwnPropertyNames(ctor).join(',') : 'none');
-      console.log('column.filter() keys:', colFilter ? Object.keys(colFilter) : 'none');
-      console.log('column.filter() proto keys:', colFilter
-        ? Object.getOwnPropertyNames(Object.getPrototypeOf(colFilter)).join(',') : 'none');
-
-      if (typeof ctor?.ofString === 'function') {
-        const test = ctor.ofString('_test_');
-        console.log('constructor.ofString result:', typeof test,
-          'toArray:', typeof test?.toArray,
-          'descriptor:', typeof test?.descriptor);
-        this._makeStringValue = (v: string) => ctor.ofString(v);
-        this._makeNumberValue = (v: any) => ctor.ofNumber(v);
-        console.log('FilterValue: using column.filter().constructor');
-        return;
-      }
-    } catch (e) {
-      console.log('column.filter().constructor approach failed:', e);
-    }
-
-    // Approach 3: Try dh.FilterValue but pass through (Enterprise Iris API style)
-    // Enterprise Iris docs show: column.filter().eqIgnoreCase("FOO")
-    // The Iris API may accept raw values OR dh.FilterValue descriptors
-    console.log('Approach 3: will use dh.FilterValue.ofString (Enterprise descriptor)');
+    // Approach 3: Use dh.FilterValue.ofString and hope eq/contains can handle it
     if (this.dh.FilterValue?.ofString) {
       this._makeStringValue = (v: string) => this.dh.FilterValue.ofString(v);
       this._makeNumberValue = (v: any) => this.dh.FilterValue.ofNumber(v);
-      console.log('FilterValue: using dh.FilterValue (Enterprise descriptor)');
+      console.log('FilterValue: using dh.FilterValue (Enterprise - may not work)');
       return;
     }
 
-    // Approach 4: Raw values as last resort
+    // Approach 4: Raw values
     console.warn('No FilterValue factory found, using raw values');
     this._makeStringValue = (v: string) => v;
     this._makeNumberValue = (v: any) => v;
-
-    // Dump full diagnostic info
-    console.log('dh keys:', Object.keys(this.dh));
-    console.log('dh.FilterValue:', this.dh.FilterValue);
-    console.log('dh.FilterCondition:', this.dh.FilterCondition,
-      'keys:', this.dh.FilterCondition ? Object.keys(this.dh.FilterCondition) : 'none');
   }
 
   /** Create a string filter value using the detected factory */
