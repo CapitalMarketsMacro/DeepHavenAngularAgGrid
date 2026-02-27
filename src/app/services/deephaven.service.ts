@@ -62,20 +62,34 @@ export class DeephavenService {
       const dh = await this.loadDeephavenApi(config.serverUrl, config.isEnterprise);
       console.log('DeepHaven API loaded:', dh);
 
-      // Create client
-      this.client = new dh.CoreClient(config.serverUrl);
-      console.log('Client created');
+      // Create client — Enterprise uses dh.Client (IrisClient), OSS uses dh.CoreClient
+      if (config.isEnterprise) {
+        this.client = new dh.Client(config.serverUrl);
+        console.log('Iris Client created');
 
-      // Login with PSK authentication (doesn't return session)
-      await this.client.login({
-        type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
-        token: config.authToken
-      });
-      console.log('Login successful');
+        await this.client.login({
+          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
+          token: config.authToken
+        });
+        console.log('Login successful');
 
-      // Get IDE connection - THIS is the session
-      this.session = await this.client.getAsIdeConnection();
-      console.log('IDE Connection obtained:', this.session);
+        // Enterprise: get IDE session via dh.Ide(client)
+        this.session = new dh.Ide(this.client);
+        console.log('IDE session obtained via dh.Ide:', this.session);
+      } else {
+        this.client = new dh.CoreClient(config.serverUrl);
+        console.log('Core+ Client created');
+
+        await this.client.login({
+          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
+          token: config.authToken
+        });
+        console.log('Login successful');
+
+        // OSS: get IDE connection from CoreClient
+        this.session = await this.client.getAsIdeConnection();
+        console.log('IDE Connection obtained:', this.session);
+      }
 
       if (!this.session) {
         throw new Error('Failed to get IDE connection after login');
@@ -200,14 +214,24 @@ export class DeephavenService {
       const dh = await this.loadDeephavenApi(serverUrl, isEnterprise);
 
       // Create client and login
-      const client = new dh.CoreClient(serverUrl);
-      await client.login({
-        type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
-        token: authToken
-      });
+      let client: any;
+      let session: any;
 
-      // Get IDE connection
-      const session = await client.getAsIdeConnection();
+      if (isEnterprise) {
+        client = new dh.Client(serverUrl);
+        await client.login({
+          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
+          token: authToken
+        });
+        session = new dh.Ide(client);
+      } else {
+        client = new dh.CoreClient(serverUrl);
+        await client.login({
+          type: 'io.deephaven.authentication.psk.PskAuthenticationHandler',
+          token: authToken
+        });
+        session = await client.getAsIdeConnection();
+      }
 
       if (!session) {
         throw new Error('Failed to get IDE connection');
