@@ -1,93 +1,122 @@
 from deephaven import time_table
-from deephaven.updateby import rolling_avg_time
-from deephaven import merge
-import random
+from deephaven import agg
 
-# On-the-run Treasury securities (most recently issued)
-OTR_SECURITIES = [
-    ("US912810TW54", "T 4.250 02/15/2054", "30Y"),
-    ("US91282CKA53", "T 4.375 02/15/2034", "10Y"),
-    ("US91282CKB37", "T 4.500 02/15/2029", "5Y"),
-    ("US91282CKC10", "T 4.625 02/15/2027", "2Y"),
-    ("US912797KV05", "T 5.250 02/13/2025", "3M"),
-    ("US912797KW87", "T 5.200 05/15/2025", "6M"),
-    ("US912797KX60", "T 5.150 02/12/2026", "1Y"),
-]
+_CUSIPS = ("`US912810TW54`,`US91282CKA53`,`US91282CKB37`,"
+           "`US91282CKC10`,`US912797KV05`,`US912797KW87`,`US912797KX60`")
+_DESCS  = ("`T 4.250 02/15/2054`,`T 4.375 02/15/2034`,`T 4.500 02/15/2029`,"
+           "`T 4.625 02/15/2027`,`T 5.250 02/13/2025`,`T 5.200 05/15/2025`,"
+           "`T 5.150 02/12/2026`")
+_TENORS = "`30Y`,`10Y`,`5Y`,`2Y`,`3M`,`6M`,`1Y`"
 
-# Create a ticking time table - generates new orders every 2 seconds
-all_orders = time_table("PT2S").update([
-    # Order identifiers
-    "OrderId = `ORD-` + String.format(`%06d`, ii)",
-    "ClOrdId = `CL-` + String.format(`%08d`, System.currentTimeMillis() % 100000000 + ii)",
+# ─────────────────────────────────────────────────────────────────────────────
+# 1-second clock — all age calculations depend on ClockTs, not currentTimeMillis
+# ─────────────────────────────────────────────────────────────────────────────
+_clock = time_table("PT1S").view(["ClockTs = Timestamp"])
 
-    # On-the-run Treasury instrument selection
-    "SecurityIndex = (int)(ii % 7)",
-    "CUSIP = new String[]{`US912810TW54`, `US91282CKA53`, `US91282CKB37`, `US91282CKC10`, `US912797KV05`, `US912797KW87`, `US912797KX60`}[SecurityIndex]",
-    "SecurityDesc = new String[]{`T 4.250 02/15/2054`, `T 4.375 02/15/2034`, `T 4.500 02/15/2029`, `T 4.625 02/15/2027`, `T 5.250 02/13/2025`, `T 5.200 05/15/2025`, `T 5.150 02/12/2026`}[SecurityIndex]",
-    "Tenor = new String[]{`30Y`, `10Y`, `5Y`, `2Y`, `3M`, `6M`, `1Y`}[SecurityIndex]",
+# ─────────────────────────────────────────────────────────────────────────────
+# Raw order stream
+#
+# TWO LEVERS for controlling active order count:
+#
+#   1. Order interval  PT1S  → new order every 1 second
+#   2. FillDelayMillis 6000–12000 → each order lives 6–12 s (random, per order)
+#
+# Steady-state active ≈ avg(FillDelay) / order_interval
+#                     ≈ 9s / 1s  = ~9 target, but random spread gives 5–12
+#
+# Tweak PT1S and the FillDelayMillis range to taste:
+#   Fewer actives  → slower interval (PT2S) or shorter delay
+#   More actives   → faster interval (PT500MS) or longer delay
+#   More variance  → widen the random range (e.g. 4000–16000)
+# ─────────────────────────────────────────────────────────────────────────────
+_raw = (
+    time_table("PT1S")                              # ← one order per second
+    .update([
+        "OrderId          = `ORD-` + String.format(`%06d`, ii)",
+        "ClOrdId          = `CL-`  + String.format(`%08d`, ii)",
+        "OrderTime        = Timestamp",
 
-    # Order details
-    "Side = (ii % 2 == 0) ? `BUY` : `SELL`",
-    "OrderType = new String[]{`LIMIT`, `LIMIT`, `MARKET`, `IOC`, `GTC`}[(int)(ii % 5)]",
-    "Quantity = (int)(Math.round(Math.random() * 100 + 1) * 1_000_000)",
-    "Price = 98.0 + Math.round(Math.random() * 400) / 128.0",
-    "Yield = 4.0 + Math.round(Math.random() * 150) / 100.0",
+        # ── Per-order random fill delay (fixed at creation, never changes) ──
+        # Range 6 000 – 12 000 ms → avg 9 s → with 1s interval → ~9 active
+        # The random spread means orders don't all fill at the same moment,
+        # creating the natural ebb-and-flow (5 → 3 → 6 → 4 …) the user wants
+        "FillDelayMillis  = (long)(6_000 + Math.random() * 6_000)",
+        "FillNanos        = epochNanos(OrderTime) + FillDelayMillis * 1_000_000L",
 
-    # Venue & trading info
-    "Venue = new String[]{`TRADEWEB`, `BLOOMBERG`, `MARKETAXESS`, `DIRECT`, `FENICS`}[(int)(ii % 5)]",
-    "Counterparty = new String[]{`GS`, `JPM`, `MS`, `BARC`, `CITI`, `BofA`, `HSBC`, `DB`, `UBS`, `CS`}[(int)(Math.round(Math.random() * 9))]",
+        "SecurityIndex    = (int)(ii % 7)",
+        "CUSIP            = new String[]{" + _CUSIPS + "}[SecurityIndex]",
+        "SecurityDesc     = new String[]{" + _DESCS  + "}[SecurityIndex]",
+        "Tenor            = new String[]{" + _TENORS + "}[SecurityIndex]",
+        "Side             = (ii % 2 == 0) ? `BUY` : `SELL`",
+        "OrderType        = new String[]{`LIMIT`,`LIMIT`,`MARKET`,`IOC`,`GTC`}[(int)(ii % 5)]",
+        "Quantity         = (long)((int)(Math.random() * 100 + 1) * 1_000_000)",
+        "LimitPrice       = Math.round((98.0 + Math.random() * 4.0) * 32.0) / 32.0",
+        "Yield            = Math.round((3.5  + Math.random() * 2.0) * 1000.0) / 1000.0",
+        "SpreadBps        = (int)(Math.random() * 50 - 10)",
+        "Venue            = new String[]{`TRADEWEB`,`BLOOMBERG`,`MARKETAXESS`,`DIRECT`,`FENICS`}[(int)(ii % 5)]",
+        "Counterparty     = new String[]{`GS`,`JPM`,`MS`,`BARC`,`CITI`,`BofA`,`HSBC`,`DB`,`UBS`,`CS`}[(int)(Math.random() * 10)]",
+        "Trader           = new String[]{`JSMITH`,`ADOE`,`MWONG`,`KPATEL`,`RJONES`}[(int)(ii % 5)]",
+        "Book             = new String[]{`RATES-NY`,`RATES-LDN`,`RATES-TKY`,`RATES-HK`}[(int)(ii % 4)]",
+        "Account          = new String[]{`PROP`,`CLIENT`,`HEDGE`,`MM`}[(int)(ii % 4)]",
+        "Priority         = (int)(Math.random() * 5) + 1",
+        "RoutingStrategy  = new String[]{`SMART`,`DIRECT`,`ALGO`,`MANUAL`}[(int)(ii % 4)]",
+    ])
+    .drop_columns("Timestamp")
+)
 
-    # Order status - starts as ACTIVE
-    "OrderStatus = `ACTIVE`",
-    "FilledQty = 0",
-    "RemainingQty = Quantity",
+# ─────────────────────────────────────────────────────────────────────────────
+# snapshot_when: re-stamps every order row with ClockTs each second
+# ─────────────────────────────────────────────────────────────────────────────
+_live = _raw.snapshot_when(_clock, stamp_cols=["ClockTs"])
 
-    # Timestamps
-    "OrderTime = Timestamp",
-    "LastUpdateTime = Timestamp",
+# ─────────────────────────────────────────────────────────────────────────────
+# epochMillis(ClockTs) creates an explicit column dependency so the engine
+# re-evaluates AgeMillis every second.  Each order uses its own FillDelayMillis
+# so IsActive flips at a different time for every order → staggered REMOVE
+# events from active_orders → natural fluctuation in row count.
+# ─────────────────────────────────────────────────────────────────────────────
+all_orders = (
+    _live
+    .update([
+        "AgeMillis         = epochMillis(ClockTs) - epochMillis(OrderTime)",
+        "IsActive          = AgeMillis < FillDelayMillis",   # ← per-order threshold
+        "OrderStatus       = IsActive ? `ACTIVE` : `FILLED`",
+        "FilledQty         = IsActive ? 0L        : Quantity",
+        "RemainingQty      = IsActive ? Quantity  : 0L",
+        "FillPct           = IsActive ? 0.0       : 100.0",
+        "FillTime          = IsActive ? (java.time.Instant)null : epochNanosToInstant(FillNanos)",
+        "SecondsRemaining  = IsActive ? (int)((FillDelayMillis - AgeMillis) / 1000) : 0",
+        "LastUpdate        = ClockTs",
+    ])
+    .drop_columns("ClockTs")
+)
 
-    # Trader info
-    "Trader = new String[]{`JSMITH`, `ADOE`, `MWONG`, `KPATEL`, `RJONES`}[(int)(ii % 5)]",
-    "Book = new String[]{`RATES-NY`, `RATES-LDN`, `RATES-TKY`, `RATES-HK`}[(int)(ii % 4)]",
-    "Account = new String[]{`PROP`, `CLIENT`, `HEDGE`, `MM`}[(int)(ii % 4)]",
+# ─────────────────────────────────────────────────────────────────────────────
+# active_orders: grows by 1 every second, shrinks when each order's personal
+#                FillDelayMillis expires → row count fluctuates naturally
+# filled_orders: grows indefinitely as orders complete
+# ─────────────────────────────────────────────────────────────────────────────
+active_orders = all_orders.where("IsActive")
+filled_orders = all_orders.where("!IsActive")
 
-    # Priority & routing
-    "Priority = (int)(Math.round(Math.random() * 5) + 1)",
-    "RoutingStrategy = new String[]{`SMART`, `DIRECT`, `ALGO`, `MANUAL`}[(int)(ii % 4)]",
-])
+# ─────────────────────────────────────────────────────────────────────────────
+# Aggregations
+# ─────────────────────────────────────────────────────────────────────────────
+order_summary = all_orders.agg_by([
+    agg.count_("OrderCount"),
+    agg.sum_("TotalNotional = Quantity"),
+    agg.avg("AvgYield       = Yield"),
+    agg.avg("AvgPrice       = LimitPrice"),
+], by=["OrderStatus", "Tenor"])
 
-# Create active orders view - orders that are less than 4 seconds old
-# After 4 seconds, orders are considered "filled" and removed from this view
-active_orders = all_orders.where([
-    "Timestamp - OrderTime < 'PT4S'"
-]).update([
-    "OrderStatus = `ACTIVE`",
-    "TimeToFill = (int)((4000 - (System.currentTimeMillis() - epochMillis(OrderTime))) / 1000)",
-    "TimeToFill = TimeToFill < 0 ? 0 : TimeToFill"
-])
+venue_summary = all_orders.agg_by([
+    agg.count_("OrderCount"),
+    agg.sum_("TotalNotional = Quantity"),
+    agg.avg("AvgYield       = Yield"),
+], by=["Venue", "OrderStatus"])
 
-# Create filled orders view - orders that are 4+ seconds old
-filled_orders = all_orders.where([
-    "Timestamp - OrderTime >= 'PT4S'"
-]).update([
-    "OrderStatus = `FILLED`",
-    "FilledQty = Quantity",
-    "RemainingQty = 0",
-    "FillTime = OrderTime + 'PT4S'",
-    "LastUpdateTime = OrderTime + 'PT4S'"
-])
-
-# Combined view showing all orders with their current status
-all_orders_status = all_orders.update([
-    "OrderStatus = (Timestamp - OrderTime < 'PT4S') ? `ACTIVE` : `FILLED`",
-    "FilledQty = (Timestamp - OrderTime >= 'PT4S') ? Quantity : 0",
-    "RemainingQty = (Timestamp - OrderTime < 'PT4S') ? Quantity : 0",
-    "AgeSeconds = (int)((System.currentTimeMillis() - epochMillis(OrderTime)) / 1000)"
-])
-
-# Summary statistics
-order_summary = all_orders_status.agg_by([
-    agg.count_("TotalOrders"),
-    agg.sum_("TotalQuantity=Quantity"),
-], by=["OrderStatus"])
-
+trader_summary = all_orders.agg_by([
+    agg.count_("OrderCount"),
+    agg.sum_("TotalNotional = Quantity"),
+    agg.avg("AvgYield       = Yield"),
+], by=["Trader", "Book", "OrderStatus"])
