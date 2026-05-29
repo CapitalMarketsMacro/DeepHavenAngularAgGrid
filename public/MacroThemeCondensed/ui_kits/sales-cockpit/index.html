@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Macro · Sales Cockpit</title>
+<link rel="icon" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../_shared/chrome.css">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="../_shared/chrome.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+const { Icon, TitleBar, TopNav, StatusBar, Panel } = Chrome;
+
+const CLIENTS = [
+  { name:'Brevan Howard', tier:'Tier 1', aum:'$34BN', spread:'-2.0bps', pnl:+124.2, flow: 88, status:'active' },
+  { name:'Bridgewater',   tier:'Tier 1', aum:'$112BN',spread:'-1.5bps', pnl:+421.0, flow: 92, status:'active' },
+  { name:'Citadel',       tier:'Tier 1', aum:'$65BN', spread:'-2.0bps', pnl:+318.7, flow: 95, status:'active' },
+  { name:'Millennium',    tier:'Tier 1', aum:'$58BN', spread:'-1.0bps', pnl:-42.4,  flow: 71, status:'active' },
+  { name:'Man AHL',       tier:'Tier 2', aum:'$22BN', spread:'+0.0bps', pnl:+18.2,  flow: 52, status:'idle' },
+  { name:'Marshall Wace', tier:'Tier 2', aum:'$19BN', spread:'+0.5bps', pnl:+8.4,   flow: 44, status:'idle' },
+  { name:'Point72',       tier:'Tier 1', aum:'$27BN', spread:'-1.5bps', pnl:+212.8, flow: 82, status:'active' },
+  { name:'Two Sigma',     tier:'Tier 1', aum:'$55BN', spread:'-2.0bps', pnl:-18.2,  flow: 90, status:'active' },
+];
+
+const AXES = [
+  { inst:'USD 10Y SOFR', side:'Buy',  size:'250MM', level:'mid +0.2', expiry:'18:00', priority:'high' },
+  { inst:'DBR 2.1 02/34',side:'Sell', size:'50MM',  level:'99.48',    expiry:'17:30', priority:'high' },
+  { inst:'UST 3.875 08/34',side:'Buy',size:'100MM', level:'98.20',    expiry:'18:00', priority:'med' },
+  { inst:'EUR 5Y ESTR',  side:'Sell', size:'75MM',  level:'2.1860',   expiry:'17:30', priority:'low' },
+];
+
+const INQUIRIES = [
+  { client:'Citadel',       inst:'USD 10Y SOFR',   side:'Sell', size:'50MM', state:'awaiting', age:'00:42' },
+  { client:'Bridgewater',   inst:'DBR 2.1 02/34',  side:'Buy',  size:'25MM', state:'priced',   age:'00:18' },
+  { client:'Brevan Howard', inst:'GBP 5Y SONIA',   side:'Buy',  size:'10MM', state:'awaiting', age:'01:24' },
+  { client:'Point72',       inst:'EUR 10Y ESTR',   side:'Sell', size:'40MM', state:'done',     age:'02:12' },
+];
+
+function ClientList({ selected, onSelect }) {
+  return (
+    <Panel title="Clients" actions={<button className="btn btn-xs btn-ghost"><Icon name="filter" size={10}/></button>} style={{width:260,flex:'0 0 auto'}}>
+      <div style={{padding:'6px 8px',borderBottom:'1px solid var(--border-1)'}}>
+        <input placeholder="Search clients…" style={{width:'100%'}}/>
+      </div>
+      {CLIENTS.map(c=>(
+        <div key={c.name} onClick={()=>onSelect(c.name)}
+             style={{padding:'8px 10px',borderBottom:'1px solid var(--border-grid)',cursor:'pointer',
+                     background:selected===c.name?'var(--bg-grid-selected)':'transparent',
+                     boxShadow:selected===c.name?'inset 2px 0 0 var(--brand)':'none'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+            <div style={{fontSize:13,fontWeight:500}}>{c.name}</div>
+            <div className={'mono ' + (c.pnl>=0?'up':'down')} style={{fontSize:11}}>{c.pnl>=0?'+':'−'}${Math.abs(c.pnl).toFixed(1)}K</div>
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:3}}>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <span className={'badge '+(c.status==='active'?'badge-live':'badge-cancelled')}><span className="dot"/>{c.status}</span>
+              <span className="tag">{c.tier}</span>
+            </div>
+            <div className="mono muted" style={{fontSize:10}}>{c.aum}</div>
+          </div>
+          <div style={{height:3,background:'var(--bg-raised)',borderRadius:2,marginTop:6,overflow:'hidden'}}>
+            <div style={{width:c.flow+'%',height:'100%',background:'var(--brand)'}}/>
+          </div>
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+function ClientDetail({ name }) {
+  return (
+    <Panel title={name} actions={<><button className="btn btn-xs"><Icon name="phone" size={10}/> Call</button><button className="btn btn-xs btn-primary"><Icon name="plus" size={10}/> New quote</button></>}>
+      <div style={{padding:12,display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,borderBottom:'1px solid var(--border-1)'}}>
+        {[['YTD vol','$14.2BN'],['YTD P&L','+$2.84M'],['Tier','1 · -2.0bps'],['Last trade','00:18 ago']].map(([l,v])=>(
+          <div key={l}>
+            <div className="label">{l}</div>
+            <div className="mono" style={{fontSize:18,fontWeight:500,marginTop:2}}>{v}</div>
+          </div>
+        ))}
+      </div>
+      <div className="panel-header" style={{background:'transparent',borderBottom:0,paddingTop:10}}>Active inquiries</div>
+      <table className="grid">
+        <thead><tr><th>Client</th><th>Instrument</th><th>Side</th><th className="num-r">Size</th><th>State</th><th>Age</th><th></th></tr></thead>
+        <tbody>
+          {INQUIRIES.map((q,i)=>(
+            <tr key={i} className={q.client===name?'selected':''}>
+              <td style={{fontWeight:500}}>{q.client}</td>
+              <td>{q.inst}</td>
+              <td className={q.side==='Buy'?'up':'down'}>{q.side}</td>
+              <td className="num-r">{q.size}</td>
+              <td>
+                {q.state==='awaiting'&&<span className="badge badge-pending"><span className="dot"/>Awaiting price</span>}
+                {q.state==='priced'&&<span className="badge badge-working"><span className="dot"/>Priced</span>}
+                {q.state==='done'&&<span className="badge badge-filled"><span className="dot"/>Done</span>}
+              </td>
+              <td className="mono muted">{q.age}</td>
+              <td>
+                <button className="btn btn-xs btn-primary">Price</button>{' '}
+                <button className="btn btn-xs btn-ghost">IM client</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="panel-header" style={{background:'transparent',borderBottom:0,paddingTop:10}}>Axes · what we want to do</div>
+      <table className="grid">
+        <thead><tr><th>Instrument</th><th>Side</th><th className="num-r">Size</th><th>Level</th><th>Expiry</th><th>Priority</th></tr></thead>
+        <tbody>
+          {AXES.map((a,i)=>(
+            <tr key={i}>
+              <td>{a.inst}</td>
+              <td className={a.side==='Buy'?'up':'down'}>{a.side}</td>
+              <td className="num-r">{a.size}</td>
+              <td className="mono">{a.level}</td>
+              <td className="muted">{a.expiry}</td>
+              <td>
+                {a.priority==='high'&&<span className="badge badge-halted"><span className="dot"/>High</span>}
+                {a.priority==='med'&&<span className="badge badge-pending"><span className="dot"/>Med</span>}
+                {a.priority==='low'&&<span className="badge badge-cancelled"><span className="dot"/>Low</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
+function App() {
+  const [sel, setSel] = useState('Citadel');
+  return (
+    <div id="root" style={{height:'100%',display:'flex',flexDirection:'column'}}>
+      <TitleBar title="Macro · Sales Cockpit · sales-mhaq@desk-8" />
+      <TopNav
+        tabs={[{id:'book',label:'Book'},{id:'clients',label:'Clients',count:142},{id:'axes',label:'Axes',count:18},{id:'colour',label:'Colour runs'}]}
+        active="clients"
+      />
+      <div className="content">
+        <ClientList selected={sel} onSelect={setSel}/>
+        <ClientDetail name={sel}/>
+      </div>
+      <StatusBar items={['book: Macro-Sales-EMEA','Inquiries: 4 active','Response p50 42s']} />
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

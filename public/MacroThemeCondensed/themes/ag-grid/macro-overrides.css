@@ -1,0 +1,87 @@
+/* =========================================================================
+   Macro — AG Grid overrides
+   -------------------------------------------------------------------------
+   Sits alongside macro-theme.js. Adds things the Theming API can't express:
+    - Tick-flash animations on value change
+    - Directional cell classes (cellClass: 'mkt-up' | 'mkt-down' | 'mkt-num')
+    - Pinned-row styling for totals rows
+    - Density-toggle attribute (data-density)
+    - OpenFin drag/no-drag zones on the grid header
+   ========================================================================= */
+
+@import url('../../colors_and_type.css');
+
+/* ---------- Directional cells ---------- */
+.ag-cell.mkt-num   { font-variant-numeric: tabular-nums; text-align: right; }
+.ag-cell.mkt-up    { color: var(--mkt-up); }
+.ag-cell.mkt-down  { color: var(--mkt-down); }
+.ag-cell.mkt-neutral { color: var(--fg-2); }
+
+/* ---------- Tick flash ---------- */
+/* Apply via refreshCells({ flashCells: true, flashDuration: 600 }) or a custom
+   cellRenderer that toggles these classes. */
+.ag-cell.mkt-flash-up    { animation: mkt-flash-up   var(--motion-flash) linear; }
+.ag-cell.mkt-flash-down  { animation: mkt-flash-down var(--motion-flash) linear; }
+.ag-cell.mkt-flash-neutral { animation: mkt-flash-neutral var(--motion-flash) linear; }
+
+/* AG Grid's built-in flash — retint to Macro colors */
+.ag-cell-data-changed        { background: var(--mkt-up-bg-flash) !important; }
+.ag-cell-data-changed-animation { transition: background var(--motion-flash) linear; }
+
+/* ---------- Pinned rows (totals, working orders) ---------- */
+.ag-pinned-top .ag-row,
+.ag-pinned-bottom .ag-row {
+  background: var(--bg-raised) !important;
+  border-top: 1px solid var(--border-2);
+  border-bottom: 1px solid var(--border-2);
+  font-weight: 500;
+}
+
+/* ---------- Sort icons ---------- */
+.ag-header-cell-sorted-asc .ag-sort-ascending-icon,
+.ag-header-cell-sorted-desc .ag-sort-descending-icon {
+  color: var(--cerulean-400);
+}
+
+/* ---------- Row selection stripe ---------- */
+.ag-row-selected::before,
+.ag-row[aria-selected="true"]::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--cerulean-400);
+  pointer-events: none;
+}
+
+/* ---------- Density toggle ---------- */
+[data-density="tight"] .ag-theme-quartz,
+[data-density="tight"].ag-theme-quartz {
+  --ag-row-height: 20px;
+  --ag-header-height: 24px;
+  --ag-font-size: 11px;
+}
+[data-density="cozy"] .ag-theme-quartz,
+[data-density="cozy"].ag-theme-quartz {
+  --ag-row-height: 32px;
+  --ag-header-height: 36px;
+  --ag-font-size: 13px;
+}
+
+/* ---------- OpenFin ---------- */
+html.openfin .ag-header { -webkit-app-region: no-drag; }
+html.openfin .ag-root-wrapper { -webkit-app-region: no-drag; }
+
+/* ---------- Keyframes ---------- */
+@keyframes mkt-flash-up {
+  0%   { background: var(--mkt-up-bg-flash); }
+  100% { background: transparent; }
+}
+@keyframes mkt-flash-down {
+  0%   { background: var(--mkt-down-bg-flash); }
+  100% { background: transparent; }
+}
+@keyframes mkt-flash-neutral {
+  0%   { background: rgba(255,255,255,0.08); }
+  100% { background: transparent; }
+}

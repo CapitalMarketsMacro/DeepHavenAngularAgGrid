@@ -1,0 +1,104 @@
+/*!
+ * Macro Design System — AG Grid v33 Theme Companion
+ * Exposes `window.macroTheme` (UMD) and `export { macroTheme }` (ESM).
+ *
+ * Usage (UMD / script tag):
+ *   <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@33/dist/ag-grid-community.min.js"></script>
+ *   <script src="https://cdn.example.com/macro-design-system@1/dist/macro-ag-grid.min.js"></script>
+ *   agGrid.createGrid(div, { theme: window.macroTheme, ... });
+ *
+ * Usage (ESM bundler):
+ *   import { themeQuartz, iconSetMaterial, colorSchemeDarkBlue } from 'ag-grid-community';
+ *   import { buildMacroTheme } from 'macro-design-system/dist/macro-ag-grid.js';
+ *   const macroTheme = buildMacroTheme({ themeQuartz, iconSetMaterial, colorSchemeDarkBlue });
+ *
+ * Pair with macro.css for tick-flash, density toggles, pinned-row styling.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory();                       // CommonJS
+  } else {
+    const api = factory();
+    root.buildMacroTheme = api.buildMacroTheme;
+    // Auto-register if AG Grid is already on the page
+    if (root.agGrid && root.agGrid.themeQuartz) {
+      root.macroTheme = api.buildMacroTheme(root.agGrid);
+    } else {
+      // Defer — consumers may load agGrid after this file
+      root.addEventListener && root.addEventListener('load', function () {
+        if (root.agGrid && root.agGrid.themeQuartz && !root.macroTheme) {
+          root.macroTheme = api.buildMacroTheme(root.agGrid);
+        }
+      });
+    }
+  }
+}(typeof self !== 'undefined' ? self : this, function () {
+
+  // Tokens mirror macro.css. Inlined so the theme works in tree-shaken builds
+  // where getComputedStyle isn't available at module-init time.
+  const T = {
+    bg_canvas:   '#12141a',
+    bg_panel:    '#181b22',
+    bg_raised:   '#1e222a',
+    bg_row_alt:  '#181b22',
+    bg_hover:    '#22262f',
+    bg_sel:      '#1a2a3f',
+    fg1:         '#e6e8ec',
+    fg3:         '#6f7687',
+    border2:     '#363c48',
+    border_grid: '#1c2029',
+    brand:       '#2aa6e6',
+    brand_soft:  'rgba(42,166,230,0.14)'
+  };
+
+  function buildMacroTheme(agGrid) {
+    const { themeQuartz, iconSetMaterial, colorSchemeDarkBlue } = agGrid || {};
+    if (!themeQuartz) {
+      console.warn('[macro-ag-grid] AG Grid v33 Theming API not detected — returning null.');
+      return null;
+    }
+    let theme = themeQuartz;
+    if (iconSetMaterial)     theme = theme.withPart(iconSetMaterial);
+    if (colorSchemeDarkBlue) theme = theme.withPart(colorSchemeDarkBlue);
+    return theme.withParams({
+      backgroundColor:                T.bg_canvas,
+      foregroundColor:                T.fg1,
+      chromeBackgroundColor:          T.bg_panel,
+      headerBackgroundColor:          T.bg_panel,
+      headerTextColor:                T.fg3,
+      borderColor:                    T.border_grid,
+      wrapperBorderRadius:            0,
+      rowBorder:                      { style: 'solid', width: 1, color: T.border_grid },
+      columnBorder:                   { style: 'none' },
+      oddRowBackgroundColor:          T.bg_row_alt,
+      rowHoverColor:                  T.bg_hover,
+      selectedRowBackgroundColor:     T.bg_sel,
+      fontFamily:                     "'IBM Plex Mono', ui-monospace, monospace",
+      fontSize:                       12,
+      headerFontFamily:               "'Roboto', system-ui, sans-serif",
+      headerFontSize:                 10,
+      headerFontWeight:               500,
+      cellHorizontalPadding:          10,
+      rowHeight:                      22,
+      headerHeight:                   28,
+      listItemHeight:                 22,
+      accentColor:                    T.brand,
+      focusShadow:                    '0 0 0 2px ' + T.bg_canvas + ', 0 0 0 4px ' + T.brand,
+      rangeSelectionBackgroundColor:  T.brand_soft,
+      rangeSelectionBorderColor:      T.brand,
+      checkboxCheckedBackgroundColor: T.brand,
+      checkboxCheckedBorderColor:     T.brand,
+      inputBackgroundColor:           T.bg_canvas,
+      inputBorder:                    { style: 'solid', width: 1, color: T.border2 },
+      inputFocusBorder:               { style: 'solid', width: 1, color: T.brand },
+      menuBackgroundColor:            T.bg_raised,
+      menuBorder:                     { style: 'solid', width: 1, color: T.border2 },
+      menuShadow:                     '0 4px 16px rgba(0,0,0,0.40)',
+      tooltipBackgroundColor:         T.bg_raised,
+      tooltipTextColor:               T.fg1,
+      tooltipBorder:                  { style: 'solid', width: 1, color: T.border2 }
+    });
+  }
+
+  return { buildMacroTheme: buildMacroTheme, tokens: T };
+}));

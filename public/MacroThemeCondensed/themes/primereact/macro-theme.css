@@ -1,0 +1,427 @@
+/* =========================================================================
+   Macro Theme for PrimeReact 10+ (Aura-based)
+   -------------------------------------------------------------------------
+   Drop this AFTER your Aura base theme:
+
+     import 'primereact/resources/themes/aura-dark-blue/theme.css';
+     import 'primeicons/primeicons.css';
+     import './macro-theme.css';   // <-- this file
+
+   PrimeReact and PrimeNG share the same DOM class names and the same Aura
+   CSS-variable contract, so this file is identical to themes/primeng/macro-theme.css
+   beyond the header comment.
+
+   Requires ./colors_and_type.css to be loaded first (the Macro tokens).
+   ========================================================================= */
+
+@import url('../../colors_and_type.css');
+
+:root,
+.p-component,
+body {
+  /* ---------------------------------------------------------------------
+     Surfaces — Aura expects a 0–950 step scale. Map our slate + brand scales.
+     --------------------------------------------------------------------- */
+  --surface-0:    var(--slate-950);
+  --surface-50:   var(--slate-900);
+  --surface-100:  var(--slate-850);
+  --surface-200:  var(--slate-800);
+  --surface-300:  var(--slate-700);
+  --surface-400:  var(--slate-600);
+  --surface-500:  var(--slate-500);
+  --surface-600:  var(--slate-400);
+  --surface-700:  var(--slate-300);
+  --surface-800:  var(--slate-200);
+  --surface-900:  var(--slate-100);
+  --surface-950:  var(--slate-50);
+
+  --surface-ground:  var(--bg-app);
+  --surface-section: var(--bg-canvas);
+  --surface-card:    var(--bg-panel);
+  --surface-overlay: var(--bg-raised);
+  --surface-border:  var(--border-1);
+  --surface-hover:   var(--bg-grid-hover);
+
+  /* ---------------------------------------------------------------------
+     Primary (brand) — Aura's primary scale drives CTAs, active tabs,
+     focus rings, selection. Point it at cerulean.
+     --------------------------------------------------------------------- */
+  --primary-50:  var(--cerulean-50);
+  --primary-100: var(--cerulean-100);
+  --primary-200: var(--cerulean-200);
+  --primary-300: var(--cerulean-300);
+  --primary-400: var(--cerulean-400);
+  --primary-500: var(--cerulean-400);   /* Aura uses 500 as the canonical */
+  --primary-600: var(--cerulean-500);
+  --primary-700: var(--cerulean-600);
+  --primary-800: var(--cerulean-700);
+  --primary-900: var(--cerulean-700);
+
+  --primary-color:          var(--cerulean-400);
+  --primary-color-text:     var(--on-brand);
+  --primary-hover-color:    var(--cerulean-300);
+  --primary-active-color:   var(--cerulean-500);
+
+  /* Semantic */
+  --highlight-bg:           var(--bg-grid-selected);
+  --highlight-text-color:   var(--fg-1);
+  --focus-ring:             0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--cerulean-400);
+  --focus-ring-color:       var(--cerulean-400);
+
+  /* Text */
+  --text-color:             var(--fg-1);
+  --text-color-secondary:   var(--fg-2);
+  --text-color-tertiary:    var(--fg-3);
+  --text-muted-color:       var(--fg-3);
+  --text-disabled-color:    var(--fg-4);
+
+  /* Borders */
+  --content-border-color:   var(--border-1);
+  --panel-border-color:     var(--border-1);
+  --border-color:           var(--border-1);
+
+  /* Radius */
+  --border-radius:          var(--r-md);
+  --content-border-radius:  var(--r-md);
+
+  /* ---------------------------------------------------------------------
+     Prime typography — force our stack, mono on numbers.
+     --------------------------------------------------------------------- */
+  --font-family:            var(--font-sans);
+  font-family:              var(--font-sans) !important;
+  font-size:                13px;
+  color:                    var(--fg-1);
+}
+
+/* Body background when Prime components sit on their own */
+body.macro-theme,
+.macro-theme {
+  background: var(--bg-app);
+  color: var(--fg-1);
+}
+
+/* =======================================================================
+   Component overrides — only what Aura doesn't already nail for trading.
+   ======================================================================= */
+
+/* ---------- Buttons ---------- */
+.p-button {
+  font-weight: 500;
+  letter-spacing: 0;
+  border-radius: var(--r-sm);
+  padding: 5px 12px;
+  font-size: 12px;
+  min-height: 28px;
+  transition: background 80ms linear, border-color 80ms linear;
+}
+.p-button.p-button-sm { min-height: 24px; font-size: 11px; padding: 3px 10px; }
+.p-button.p-button-lg { min-height: 34px; font-size: 13px; padding: 7px 16px; }
+.p-button.p-button-text:not(:disabled):hover { background: var(--bg-grid-hover); }
+.p-button, .p-button .p-button-label { white-space: nowrap; }
+.p-button .p-button-icon,
+.p-button .pi,
+.p-inputnumber-button .pi { font-family: primeicons !important; speak: none; font-style: normal; font-weight: normal; }
+
+/* Bid / Ask one-shot buttons — directional */
+.p-button.macro-bid {
+  background: rgba(52,217,122,0.12);
+  border: 1px solid var(--green-700);
+  color: var(--green-300);
+}
+.p-button.macro-bid:hover { background: rgba(52,217,122,0.20); color: var(--green-300); }
+.p-button.macro-ask {
+  background: rgba(255,107,100,0.12);
+  border: 1px solid var(--red-700);
+  color: var(--red-300);
+}
+.p-button.macro-ask:hover { background: rgba(255,107,100,0.20); color: var(--red-300); }
+
+/* ---------- Inputs ---------- */
+.p-inputtext,
+.p-inputnumber-input,
+.p-dropdown,
+.p-multiselect,
+.p-autocomplete-input,
+.p-calendar input {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-2);
+  color: var(--fg-1);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: var(--r-sm);
+  min-height: 28px;
+}
+.p-inputtext:enabled:focus,
+.p-dropdown:not(.p-disabled).p-focus,
+.p-multiselect:not(.p-disabled).p-focus,
+.p-calendar input:focus {
+  border-color: var(--cerulean-400);
+  box-shadow: 0 0 0 2px var(--brand-soft);
+  outline: none;
+}
+.p-inputtext::placeholder { color: var(--fg-4); }
+
+/* ---------- Dropdown / MultiSelect / AutoComplete panels ---------- */
+.p-dropdown-panel,
+.p-multiselect-panel,
+.p-autocomplete-panel,
+.p-overlaypanel,
+.p-menu,
+.p-tieredmenu,
+.p-contextmenu {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  padding: 4px 0;
+}
+.p-dropdown-item,
+.p-multiselect-item,
+.p-autocomplete-item,
+.p-menuitem-link {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--fg-1);
+}
+.p-dropdown-item:hover,
+.p-multiselect-item:hover,
+.p-menuitem-link:hover {
+  background: var(--bg-grid-hover) !important;
+}
+.p-dropdown-item.p-highlight,
+.p-multiselect-item.p-highlight {
+  background: var(--brand-soft) !important;
+  color: var(--cerulean-300) !important;
+}
+
+/* ---------- DataTable (Prime's own; AG Grid has its own theme) ---------- */
+.p-datatable {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.p-datatable .p-datatable-header {
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-2);
+  padding: 6px 10px;
+}
+.p-datatable .p-datatable-thead > tr > th {
+  background: var(--bg-panel);
+  color: var(--fg-3);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-2);
+}
+.p-datatable .p-datatable-tbody > tr {
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-grid);
+  transition: background 40ms linear;
+}
+.p-datatable .p-datatable-tbody > tr:nth-child(even) { background: var(--bg-grid-alt); }
+.p-datatable .p-datatable-tbody > tr:hover { background: var(--bg-grid-hover); }
+.p-datatable .p-datatable-tbody > tr.p-highlight,
+.p-datatable .p-datatable-tbody > tr[aria-selected="true"] {
+  background: var(--bg-grid-selected);
+  box-shadow: inset 2px 0 0 var(--cerulean-400);
+}
+.p-datatable .p-datatable-tbody > tr > td {
+  padding: 3px 10px;
+  color: var(--fg-1);
+  border-bottom: 1px solid var(--border-grid);
+  line-height: 1.3;
+}
+.p-datatable-sm .p-datatable-tbody > tr > td { padding: 2px 8px; }
+.p-datatable-lg .p-datatable-tbody > tr > td { padding: 6px 12px; }
+
+/* Directional cell helpers — put on <td class="mkt-up"> etc */
+.p-datatable .mkt-up    { color: var(--mkt-up); }
+.p-datatable .mkt-down  { color: var(--mkt-down); }
+.p-datatable .mkt-num   { text-align: right; font-variant-numeric: tabular-nums; }
+.p-datatable td.flash-up    { animation: mkt-flash-up   var(--motion-flash) linear; }
+.p-datatable td.flash-down  { animation: mkt-flash-down var(--motion-flash) linear; }
+
+/* ---------- Dialog / Sidebar / OverlayPanel ---------- */
+.p-dialog {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+}
+.p-dialog .p-dialog-header,
+.p-sidebar .p-sidebar-header {
+  background: var(--bg-panel);
+  color: var(--fg-1);
+  border-bottom: 1px solid var(--border-1);
+  padding: 10px 14px;
+  font-weight: 500;
+  font-size: 13px;
+}
+.p-dialog .p-dialog-content,
+.p-sidebar .p-sidebar-content {
+  background: var(--bg-panel);
+  color: var(--fg-1);
+  padding: 14px;
+}
+.p-dialog .p-dialog-footer {
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-1);
+  padding: 10px 14px;
+}
+.p-sidebar { background: var(--bg-panel); }
+
+/* ---------- Tabs / Menubar / TabView ---------- */
+.p-tabview-nav,
+.p-menubar {
+  background: transparent;
+  border-bottom: 1px solid var(--border-1);
+}
+.p-tabview-nav li .p-tabview-nav-link,
+.p-menuitem-link {
+  background: transparent;
+  color: var(--fg-2);
+  border: 0;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.p-tabview-nav li.p-highlight .p-tabview-nav-link {
+  color: var(--fg-1);
+  border-bottom-color: var(--cerulean-400);
+  background: transparent;
+}
+.p-tabview-panels { background: transparent; padding: 12px 0 0; }
+
+/* ---------- Toast / Message / ConfirmDialog ---------- */
+.p-toast .p-toast-message {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-2);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  color: var(--fg-1);
+  font-size: 12px;
+}
+.p-toast .p-toast-message.p-toast-message-success { border-left-color: var(--status-ok); }
+.p-toast .p-toast-message.p-toast-message-info    { border-left-color: var(--status-info); }
+.p-toast .p-toast-message.p-toast-message-warn    { border-left-color: var(--status-warn); }
+.p-toast .p-toast-message.p-toast-message-error   { border-left-color: var(--status-error); }
+
+.p-message {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-1);
+  border-left-width: 3px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  color: var(--fg-1);
+  padding: 6px 10px;
+}
+.p-message.p-message-success { border-left-color: var(--status-ok);    background: rgba(52,217,122,.06); }
+.p-message.p-message-info    { border-left-color: var(--status-info);  background: rgba(91,141,239,.06); }
+.p-message.p-message-warn    { border-left-color: var(--status-warn);  background: rgba(245,193,58,.06); }
+.p-message.p-message-error   { border-left-color: var(--status-error); background: rgba(255,107,100,.06); }
+
+/* ---------- Tree / TreeTable ---------- */
+.p-tree {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  padding: 4px;
+  font-size: 12px;
+}
+.p-tree .p-treenode-content:hover { background: var(--bg-grid-hover); }
+.p-tree .p-treenode-content.p-highlight { background: var(--bg-grid-selected); color: var(--fg-1); }
+.p-tree .p-tree-toggler-icon { color: var(--fg-3); }
+
+.p-treetable .p-treetable-tbody > tr > td { padding: 3px 10px; border-bottom: 1px solid var(--border-grid); }
+.p-treetable .p-treetable-tbody > tr:hover { background: var(--bg-grid-hover); }
+
+/* ---------- Chip / Tag / Badge ---------- */
+.p-chip, .p-tag {
+  background: var(--bg-raised);
+  color: var(--fg-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-sm);
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+.p-tag.p-tag-success { background: rgba(52,217,122,.12); color: var(--green-300); border-color: var(--green-700); }
+.p-tag.p-tag-info    { background: rgba(91,141,239,.14); color: var(--blue-300);  border-color: var(--blue-600); }
+.p-tag.p-tag-warning { background: rgba(245,193,58,.14); color: var(--yellow-300); border-color: #7a5a04; }
+.p-tag.p-tag-danger  { background: rgba(255,107,100,.14); color: var(--red-300);  border-color: var(--red-700); }
+
+.p-badge {
+  background: var(--border-2);
+  color: var(--fg-1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 999px;
+  padding: 0 5px;
+}
+.p-badge.p-badge-success { background: var(--status-ok);    color: var(--fg-inverse); }
+.p-badge.p-badge-info    { background: var(--status-info);  color: var(--fg-inverse); }
+.p-badge.p-badge-warning { background: var(--status-warn);  color: var(--fg-inverse); }
+.p-badge.p-badge-danger  { background: var(--status-error); color: #fff; }
+
+/* ---------- Checkbox / Radio / Switch ---------- */
+.p-checkbox .p-checkbox-box,
+.p-radiobutton .p-radiobutton-box {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-2);
+  width: 14px; height: 14px;
+}
+.p-checkbox .p-checkbox-box.p-highlight,
+.p-radiobutton .p-radiobutton-box.p-highlight {
+  background: var(--cerulean-400);
+  border-color: var(--cerulean-400);
+}
+.p-inputswitch .p-inputswitch-slider { background: var(--border-2); border-radius: 999px; }
+.p-inputswitch.p-inputswitch-checked .p-inputswitch-slider { background: var(--cerulean-400); }
+
+/* ---------- Scrollbars inside Prime panels ---------- */
+.p-component ::-webkit-scrollbar { width: 10px; height: 10px; }
+.p-component ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
+.p-component ::-webkit-scrollbar-thumb:hover { background: var(--border-3); }
+.p-component ::-webkit-scrollbar-track { background: transparent; }
+
+/* =======================================================================
+   Density — data-density attribute on the closest scope (body or panel)
+   toggles grid / input / button heights.
+   ======================================================================= */
+
+[data-density="tight"] .p-datatable .p-datatable-tbody > tr > td { padding: 1px 8px; font-size: 11px; }
+[data-density="tight"] .p-inputtext,
+[data-density="tight"] .p-dropdown,
+[data-density="tight"] .p-button             { min-height: 24px; font-size: 11px; padding: 3px 8px; }
+
+[data-density="cozy"] .p-datatable .p-datatable-tbody > tr > td { padding: 6px 12px; font-size: 13px; }
+[data-density="cozy"] .p-inputtext,
+[data-density="cozy"] .p-dropdown,
+[data-density="cozy"] .p-button              { min-height: 34px; font-size: 13px; padding: 7px 14px; }
+
+/* =======================================================================
+   OpenFin hooks — only active when the document has class="openfin"
+   ======================================================================= */
+
+html.openfin body { border: 1px solid var(--border-2); }
+html.openfin .macro-titlebar { -webkit-app-region: drag; }
+html.openfin .macro-titlebar button,
+html.openfin .macro-titlebar input,
+html.openfin .macro-titlebar .tab { -webkit-app-region: no-drag; }
+html.openfin .p-dialog-header    { -webkit-app-region: drag; }
+html.openfin .p-dialog-header-icons { -webkit-app-region: no-drag; }

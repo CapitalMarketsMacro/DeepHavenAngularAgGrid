@@ -1,0 +1,346 @@
+/* ==========================================================================
+   Macro Design System — Colors & Type tokens
+   --------------------------------------------------------------------------
+   Dark-default trading UI. Light theme provided as a `.theme-light` override.
+   Target density: 12–13px body, 11–12px grid rows.
+   ========================================================================== */
+
+@import url('./fonts/fonts.css');
+
+/* --------------------------------------------------------------------------
+   1. CORE PALETTE  (raw colors — never use directly in components)
+   -------------------------------------------------------------------------- */
+:root {
+  /* Neutrals — a cool, slightly blue-tinted slate for long-session readability */
+  --slate-50:  #f6f7f9;
+  --slate-100: #eceef2;
+  --slate-200: #d6dae2;
+  --slate-300: #aeb4c1;
+  --slate-400: #7b8392;
+  --slate-500: #565d6b;
+  --slate-600: #3b414c;
+  --slate-700: #2a2f39;
+  --slate-800: #1e222a;
+  --slate-850: #181b22;
+  --slate-900: #12141a;
+  --slate-950: #0b0d12;
+
+  /* Brand — "Macro Cerulean". Cool steel blue, legible on dark, distinct from the info blue (--blue-*). */
+  --cerulean-50:  #e7f4fd;
+  --cerulean-100: #c2e4fb;
+  --cerulean-200: #8ecdf6;
+  --cerulean-300: #55b2ee;
+  --cerulean-400: #2aa6e6;   /* primary brand */
+  --cerulean-500: #1685c2;
+  --cerulean-600: #0f6497;
+  --cerulean-700: #0a476c;
+
+  /* Semantic — directional (bid/ask, up/down, pass/fail) */
+  --green-300: #6ee7a8;
+  --green-400: #34d97a;
+  --green-500: #16a85c;
+  --green-600: #0f7f45;
+  --green-700: #0a5c32;
+  --green-900: #08281a;
+
+  --red-300:   #ff9a95;
+  --red-400:   #ff6b64;
+  --red-500:   #e84038;
+  --red-600:   #b82c25;
+  --red-700:   #861e19;
+  --red-900:   #3a0f0c;
+
+  --yellow-300: #ffd96a;
+  --yellow-400: #f5c13a;
+  --yellow-500: #c79306;
+
+  --blue-300:  #8fb5ff;
+  --blue-400:  #5b8def;
+  --blue-500:  #3566d9;
+  --blue-600:  #234aa6;
+  --blue-900:  #0f1d3f;
+
+  --purple-400: #a88cf2;
+  --purple-500: #7a5cd9;
+
+  /* ------------------------------------------------------------------------
+     2. SEMANTIC TOKENS (dark, default) — USE THESE in components
+     ------------------------------------------------------------------------ */
+
+  /* Surfaces */
+  --bg-app:        var(--slate-950);   /* outermost app chrome */
+  --bg-canvas:     var(--slate-900);   /* default content background */
+  --bg-panel:      var(--slate-850);   /* cards / panels one level up */
+  --bg-raised:     var(--slate-800);   /* menus, popovers, ticket */
+  --bg-overlay:    rgba(6, 8, 12, 0.72);
+  --bg-grid-row:   var(--slate-900);
+  --bg-grid-alt:   var(--slate-850);
+  --bg-grid-hover: #22262f;
+  --bg-grid-selected: #1a2a3f;
+
+  /* Foregrounds */
+  --fg-1: #e6e8ec;   /* primary text */
+  --fg-2: #a8afbd;   /* secondary text / labels */
+  --fg-3: #6f7687;   /* tertiary / captions */
+  --fg-4: #4a5060;   /* disabled / placeholders */
+  --fg-inverse: #0b0d12;
+
+  /* Borders */
+  --border-1: #2a2f39;  /* default separators */
+  --border-2: #363c48;  /* stronger edges */
+  --border-3: #4a5060;  /* inputs when focused */
+  --border-grid: #1c2029; /* grid cell borders — barely visible */
+
+  /* Brand */
+  --brand:         var(--cerulean-400);
+  --brand-hover:   var(--cerulean-300);
+  --brand-press:   var(--cerulean-500);
+  --brand-soft:    rgba(42, 166, 230, 0.14);
+  --on-brand:      #041a26;
+
+  /* Market / directional — the most important tokens in this system */
+  --mkt-up:        var(--green-400);
+  --mkt-up-bg:     rgba(52, 217, 122, 0.14);
+  --mkt-up-bg-flash: rgba(52, 217, 122, 0.42);
+  --mkt-down:      var(--red-400);
+  --mkt-down-bg:   rgba(255, 107, 100, 0.14);
+  --mkt-down-bg-flash: rgba(255, 107, 100, 0.42);
+  --mkt-neutral:   var(--fg-2);
+
+  --bid:           var(--green-400);
+  --bid-bg:        rgba(52, 217, 122, 0.10);
+  --ask:           var(--red-400);
+  --ask-bg:        rgba(255, 107, 100, 0.10);
+
+  /* Status */
+  --status-info:    var(--blue-400);
+  --status-info-bg: rgba(91, 141, 239, 0.14);
+  --status-warn:    var(--yellow-400);
+  --status-warn-bg: rgba(245, 193, 58, 0.14);
+  --status-error:   var(--red-400);
+  --status-error-bg:rgba(255, 107, 100, 0.14);
+  --status-ok:      var(--green-400);
+  --status-ok-bg:   rgba(52, 217, 122, 0.14);
+  --status-live:    var(--green-400);
+  --status-stale:   var(--yellow-400);
+  --status-halted:  var(--red-400);
+
+  /* Focus ring */
+  --focus-ring: 0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--cerulean-400);
+
+  /* ------------------------------------------------------------------------
+     3. TYPE TOKENS
+     ------------------------------------------------------------------------ */
+  --font-sans: "Roboto Condensed", "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", "Menlo", "Consolas", monospace;
+
+  /* Tabular numerals — critical for price columns */
+  --numeric-feature: "tnum" 1, "lnum" 1, "zero" 1;
+
+  /* Scale (compact, trading-appropriate) */
+  --fs-10: 10px;   /* micro labels */
+  --fs-11: 11px;   /* grid rows, dense tables */
+  --fs-12: 12px;   /* default body */
+  --fs-13: 13px;   /* comfortable body */
+  --fs-14: 14px;   /* emphasized body */
+  --fs-16: 16px;   /* h4 */
+  --fs-20: 20px;   /* h3 */
+  --fs-24: 24px;   /* h2 */
+  --fs-32: 32px;   /* h1 */
+  --fs-48: 48px;   /* display */
+
+  --lh-tight:  1.15;
+  --lh-snug:   1.3;
+  --lh-normal: 1.5;
+
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semibold:600;
+  --fw-bold:    700;
+
+  --ls-tight:   -0.01em;
+  --ls-normal:   0;
+  --ls-wide:    0.02em;
+  --ls-allcaps: 0.06em;
+
+  /* ------------------------------------------------------------------------
+     4. SPACING, RADII, SHADOW, MOTION
+     ------------------------------------------------------------------------ */
+  --space-0: 0;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --space-9: 32px;
+  --space-10: 48px;
+  --space-11: 64px;
+
+  --radius-xs: 2px;
+  --radius-sm: 3px;   /* default for grid cells, inputs */
+  --radius-md: 5px;   /* buttons, pills */
+  --radius-lg: 8px;   /* panels, cards */
+  --radius-xl: 12px;  /* modals */
+  --radius-round: 999px;
+
+  /* Elevation — minimal. Trading UIs prefer borders over shadows. */
+  --shadow-0: none;
+  --shadow-1: 0 1px 0 rgba(0,0,0,0.35), 0 0 0 1px var(--border-1);
+  --shadow-2: 0 4px 12px rgba(0,0,0,0.45), 0 0 0 1px var(--border-1);
+  --shadow-3: 0 12px 32px rgba(0,0,0,0.55), 0 0 0 1px var(--border-2);
+  --shadow-flash-up:   inset 0 0 0 1px var(--green-400);
+  --shadow-flash-down: inset 0 0 0 1px var(--red-400);
+
+  /* Motion — fast, functional. No bounces. */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-instant: 80ms;
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 260ms;
+  --dur-flash: 600ms;   /* price-tick flash fade */
+
+  /* Row/control heights — density anchor */
+  --h-grid-row: 22px;
+  --h-grid-header: 26px;
+  --h-control-xs: 20px;
+  --h-control-sm: 24px;
+  --h-control-md: 28px;
+  --h-control-lg: 32px;
+}
+
+/* --------------------------------------------------------------------------
+   Light theme override
+   -------------------------------------------------------------------------- */
+.theme-light {
+  --bg-app:        #eceef2;
+  --bg-canvas:     #ffffff;
+  --bg-panel:      #f6f7f9;
+  --bg-raised:     #ffffff;
+  --bg-overlay:    rgba(20, 24, 32, 0.48);
+  --bg-grid-row:   #ffffff;
+  --bg-grid-alt:   #f6f7f9;
+  --bg-grid-hover: #eef1f6;
+  --bg-grid-selected: #e2ecff;
+
+  --fg-1: #12141a;
+  --fg-2: #3b414c;
+  --fg-3: #7b8392;
+  --fg-4: #aeb4c1;
+  --fg-inverse: #ffffff;
+
+  --border-1: #e1e4ea;
+  --border-2: #cdd2db;
+  --border-3: #7b8392;
+  --border-grid: #edeff3;
+
+  --brand:       #1685c2;
+  --brand-hover: #2aa6e6;
+  --brand-press: #0f6497;
+  --brand-soft:  rgba(22, 133, 194, 0.10);
+  --on-brand:    #ffffff;
+
+  --mkt-up: #0f7f45;
+  --mkt-up-bg: rgba(16, 168, 92, 0.12);
+  --mkt-up-bg-flash: rgba(16, 168, 92, 0.32);
+  --mkt-down: #b82c25;
+  --mkt-down-bg: rgba(232, 64, 56, 0.12);
+  --mkt-down-bg-flash: rgba(232, 64, 56, 0.32);
+  --bid: #0f7f45;
+  --bid-bg: rgba(16, 168, 92, 0.08);
+  --ask: #b82c25;
+  --ask-bg: rgba(232, 64, 56, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   5. SEMANTIC ELEMENT STYLES (base)
+   -------------------------------------------------------------------------- */
+html, body {
+  background: var(--bg-app);
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  line-height: var(--lh-normal);
+  font-feature-settings: "cv11" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, .h1 {
+  font-size: var(--fs-32);
+  line-height: var(--lh-tight);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-tight);
+  color: var(--fg-1);
+  margin: 0;
+}
+h2, .h2 {
+  font-size: var(--fs-24);
+  line-height: var(--lh-tight);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-tight);
+  color: var(--fg-1);
+  margin: 0;
+}
+h3, .h3 {
+  font-size: var(--fs-20);
+  line-height: var(--lh-snug);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-1);
+  margin: 0;
+}
+h4, .h4 {
+  font-size: var(--fs-16);
+  line-height: var(--lh-snug);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-1);
+  margin: 0;
+}
+
+p { margin: 0; color: var(--fg-1); }
+
+.label {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-allcaps);
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.caption {
+  font-size: var(--fs-11);
+  color: var(--fg-3);
+}
+
+.mono, code, kbd, .num {
+  font-family: var(--font-mono);
+  font-feature-settings: var(--numeric-feature);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--brand);
+  text-decoration: none;
+}
+a:hover { color: var(--brand-hover); }
+
+::selection { background: var(--brand-soft); color: var(--fg-1); }
+
+/* Market value helpers */
+.up    { color: var(--mkt-up); }
+.down  { color: var(--mkt-down); }
+.bid   { color: var(--bid); }
+.ask   { color: var(--ask); }
+.muted { color: var(--fg-3); }
+
+/* Scrollbars — thin, dark */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--slate-700); border-radius: var(--radius-sm); border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--slate-600); border: 2px solid transparent; background-clip: padding-box; }

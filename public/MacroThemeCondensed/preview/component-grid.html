@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="_preview.css"></head>
+<body><div class="card">
+  <style>
+    table.grid-demo { border-collapse:collapse; width:100%; font-family:var(--font-mono); font-size:11px }
+    .grid-demo th { background:#181b22; color:#6f7687; font-weight:500; text-align:left; padding:4px 8px; border-bottom:1px solid #2a2f39; letter-spacing:.04em; text-transform:uppercase; font-size:10px }
+    .grid-demo td { padding:3px 8px; border-bottom:1px solid #1c2029; height:22px; color:#e6e8ec }
+    .grid-demo tr:hover td { background:#22262f }
+    .grid-demo .sel td { background:#1a2a3f; box-shadow: inset 2px 0 0 #2aa6e6 }
+    .num-r { text-align:right }
+    .up { color:#34d97a } .down { color:#ff6b64 }
+    @keyframes fu { 0%{background:rgba(52,217,122,.42)} 100%{} }
+    @keyframes fd { 0%{background:rgba(255,107,100,.42)} 100%{} }
+    .flash-u { animation:fu 600ms linear } .flash-d { animation:fd 600ms linear }
+  </style>
+  <div class="label" style="margin-bottom:8px">Grid rows — 22px, tabular nums, hover + selection + tick flash</div>
+  <table class="grid-demo">
+    <thead><tr><th>Instrument</th><th class="num-r">Bid</th><th class="num-r">Ask</th><th class="num-r">Last</th><th class="num-r">Chg</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>USD 2Y SOFR</td><td class="num-r up">4.1820</td><td class="num-r down">4.1840</td><td class="num-r flash-u">4.1830</td><td class="num-r up">+0.0020</td><td style="color:#6ee7a8">● Live</td></tr>
+      <tr class="sel"><td>USD 10Y SOFR</td><td class="num-r up">4.2375</td><td class="num-r down">4.2395</td><td class="num-r">4.2385</td><td class="num-r up">+0.0040</td><td style="color:#6ee7a8">● Live</td></tr>
+      <tr><td>EUR 5Y ESTR</td><td class="num-r up">2.1830</td><td class="num-r down">2.1850</td><td class="num-r flash-d">2.1840</td><td class="num-r down">−0.0015</td><td style="color:#ffd96a">● Stale</td></tr>
+      <tr><td>GBP 10Y SONIA</td><td class="num-r up">4.5110</td><td class="num-r down">4.5130</td><td class="num-r">4.5120</td><td class="num-r down">−0.0080</td><td style="color:#ff9a95">● Halted</td></tr>
+    </tbody>
+  </table>
+</div>
+<script>
+  setInterval(()=>{document.querySelectorAll('.flash-u,.flash-d').forEach(el=>{el.style.animation='none';void el.offsetWidth;el.style.animation=null;});},2400);
+</script>
+</body></html>

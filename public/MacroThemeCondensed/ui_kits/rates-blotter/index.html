@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Macro · Rates Blotter</title>
+<link rel="icon" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../_shared/chrome.css">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="../_shared/chrome.jsx"></script>
+<script type="text/babel" src="./Blotter.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+const { Icon, TitleBar, TopNav, StatusBar, Panel } = Chrome;
+
+const WATCHLISTS = [
+  { name: 'USD Curve', items: ['USD 2Y SOFR','USD 5Y SOFR','USD 10Y SOFR','USD 30Y SOFR'] },
+  { name: 'EUR Curve', items: ['EUR 2Y ESTR','EUR 5Y ESTR','EUR 10Y ESTR'] },
+  { name: 'Gov Bonds', items: ['UST 3.875 08/34','DBR 2.1 02/34','UKT 4.625 10/33'] },
+  { name: 'Repo + MM', items: ['USD Repo O/N','USD 3M Libor','EUR Repo O/N'] },
+];
+
+function App() {
+  const [active, setActive] = useState('blotter');
+  const tabs = [
+    { id:'blotter', label:'Blotter' },
+    { id:'watch',   label:'Watchlist' },
+    { id:'curve',   label:'Curves' },
+    { id:'orders',  label:'Orders', count: 12 },
+    { id:'trades',  label:'Trades' },
+  ];
+  return (
+    <div id="root" style={{height:'100%',display:'flex',flexDirection:'column'}}>
+      <TitleBar title="Macro · Rates Blotter · trader-jlin@desk-14" />
+      <TopNav tabs={tabs} active={active} onTab={setActive}
+        right={<><button className="btn btn-sm"><Icon name="search" size={12}/> Search</button><button className="btn btn-sm btn-primary"><Icon name="plus" size={12}/> New order</button></>}
+      />
+      <div className="content">
+        <InstrumentSidebar groups={WATCHLISTS} />
+        <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0,minHeight:0}}>
+          <div style={{flex:'1 1 62%',minHeight:0,display:'flex'}}>
+            <div style={{flex:1,minWidth:0,display:'flex'}}>
+              <PriceBlotter />
+            </div>
+          </div>
+          <div className="splitter-h" />
+          <div style={{flex:'1 1 38%',minHeight:0,display:'flex'}}>
+            <WorkingOrders />
+          </div>
+        </div>
+      </div>
+      <StatusBar items={['book: Macro-Rates-14', 'P&L: +$238.4K', 'DV01: $14,821']} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

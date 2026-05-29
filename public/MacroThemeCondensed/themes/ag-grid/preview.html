@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AG Grid × Macro</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="stylesheet" href="./macro-overrides.css">
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@33/dist/ag-grid-community.min.js"></script>
+<script src="./macro-theme.js"></script>
+<style>
+  html,body { height:100%; margin:0; background:var(--bg-app); color:var(--fg-1); font-family:var(--font-sans); }
+  header { display:flex; align-items:center; gap:14px; padding:10px 14px; border-bottom:1px solid var(--border-1); background:var(--bg-canvas); }
+  header h1 { font-size:13px; font-weight:500; margin:0; letter-spacing:-0.01em; }
+  header .sub { font-size:10px; color:var(--fg-3); letter-spacing:.08em; text-transform:uppercase; }
+  header .spacer { flex:1; }
+  .seg { display:inline-flex; border:1px solid var(--border-2); border-radius:var(--r-sm); overflow:hidden; }
+  .seg button { background:transparent; border:0; color:var(--fg-2); font:500 11px/1 var(--font-sans); padding:5px 10px; cursor:pointer; }
+  .seg button.on { background:var(--brand-soft); color:var(--cerulean-300); }
+  #grid { height:calc(100vh - 48px); width:100%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Macro · Live rates blotter</h1>
+  <span class="sub">AG Grid v33 · Macro theme</span>
+  <span class="spacer"></span>
+  <span class="sub" style="color:var(--fg-3)">Density</span>
+  <div class="seg" id="densitySeg">
+    <button data-d="tight">Tight</button>
+    <button data-d="" class="on">Dense</button>
+    <button data-d="cozy">Cozy</button>
+  </div>
+</header>
+<div id="grid"></div>
+<script>
+const INSTRUMENTS = [
+  ['USD 2Y SOFR','SOFR','2Y',4.812],['USD 5Y SOFR','SOFR','5Y',4.113],
+  ['USD 10Y SOFR','SOFR','10Y',4.238],['USD 30Y SOFR','SOFR','30Y',4.451],
+  ['EUR 2Y ESTR','ESTR','2Y',2.424],['EUR 5Y ESTR','ESTR','5Y',2.188],
+  ['EUR 10Y ESTR','ESTR','10Y',2.342],['GBP 5Y SONIA','SONIA','5Y',4.021],
+  ['GBP 10Y SONIA','SONIA','10Y',4.512],
+  ['UST 3.875 08/34','GOV','10Y',98.202],['DBR 2.1 02/34','GOV','10Y',99.456],
+  ['UKT 4.625 10/33','GOV','10Y',101.221],
+];
+const rows = INSTRUMENTS.map(([name, curve, tenor, mid])=>({
+  instrument: name, curve, tenor, mid,
+  bid: +(mid-0.002).toFixed(4), ask: +(mid+0.002).toFixed(4),
+  change: +((Math.random()-0.5)*0.06).toFixed(4),
+  size: Math.round(5+Math.random()*95),
+  venue: ['TradeWeb','BBG','MTS','BrokerTec','MarketAxess'][Math.floor(Math.random()*5)],
+  state: 'live',
+}));
+
+const api = agGrid.createGrid(document.getElementById('grid'), {
+  theme: window.macroTheme,
+  rowData: rows,
+  cellFlashDuration: 600,
+  cellFadeDuration: 1000,
+  rowSelection: { mode: 'singleRow', checkboxes: false, enableClickSelection: true },
+  animateRows: false,
+  columnDefs: [
+    { field:'instrument', headerName:'Instrument', width:180, pinned:'left' },
+    { field:'curve',  headerName:'Curve',  width:80 },
+    { field:'tenor',  headerName:'Tenor',  width:70, cellClass:'mkt-num' },
+    { field:'bid',    headerName:'Bid',    width:90, cellClass: p => ['mkt-num','mkt-up'],    valueFormatter:p=>p.value.toFixed(4), enableCellChangeFlash:true },
+    { field:'mid',    headerName:'Mid',    width:90, cellClass:'mkt-num',                     valueFormatter:p=>p.value.toFixed(4), enableCellChangeFlash:true },
+    { field:'ask',    headerName:'Ask',    width:90, cellClass: p => ['mkt-num','mkt-down'],  valueFormatter:p=>p.value.toFixed(4), enableCellChangeFlash:true },
+    { field:'change', headerName:'Δ',      width:90, cellClass: p => ['mkt-num', p.value>=0?'mkt-up':'mkt-down'], valueFormatter:p=>(p.value>=0?'+':'')+p.value.toFixed(4), enableCellChangeFlash:true },
+    { field:'size',   headerName:'Size (MM)', width:100, cellClass:'mkt-num' },
+    { field:'venue',  headerName:'Venue',  width:110 },
+    { field:'state',  headerName:'State',  width:80,
+      cellRenderer: p => `<span class="badge badge-live"><span class="dot"></span>LIVE</span>`,
+    },
+  ],
+  defaultColDef: { sortable:true, resizable:true, filter:false },
+});
+
+// Simulate a ticking book
+setInterval(() => {
+  const r = rows[Math.floor(Math.random()*rows.length)];
+  const delta = (Math.random()-0.5)*0.008;
+  r.mid = +(r.mid + delta).toFixed(4);
+  r.bid = +(r.mid - 0.002).toFixed(4);
+  r.ask = +(r.mid + 0.002).toFixed(4);
+  r.change = +(r.change + delta).toFixed(4);
+  api.applyTransaction({ update: [r] });
+}, 320);
+
+// Density toggle
+document.getElementById('densitySeg').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const d = btn.dataset.d;
+  document.documentElement.dataset.density = d;
+  document.querySelectorAll('#densitySeg button').forEach(b=>b.classList.toggle('on', b===btn));
+});
+</script>
+</body>
+</html>

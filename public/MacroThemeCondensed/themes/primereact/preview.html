@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PrimeReact × Macro</title>
+<link rel="stylesheet" href="https://unpkg.com/primereact@10.9.2/resources/themes/lara-dark-blue/theme.css">
+<link rel="stylesheet" href="https://unpkg.com/primeicons@6.0.1/primeicons.css">
+<link rel="stylesheet" href="./macro-theme.css">
+<style>
+  html,body { margin:0; background:var(--bg-app); color:var(--fg-1); font-family:var(--font-sans); min-height:100vh; }
+  .wrap { max-width:1280px; margin:0 auto; padding:18px 22px 40px; }
+  h1 { font-size:14px; font-weight:500; letter-spacing:-0.01em; margin:0 0 2px; }
+  .sub { font-size:10px; color:var(--fg-3); letter-spacing:.08em; text-transform:uppercase; margin:0 0 18px; }
+  section { padding:16px 0; border-top:1px solid var(--border-1); }
+  section:first-of-type { border-top:0; }
+  h2 { font-size:10px; font-weight:500; color:var(--fg-3); letter-spacing:.08em; text-transform:uppercase; margin:0 0 10px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .note { background:var(--bg-panel); border:1px solid var(--border-1); border-left:3px solid var(--cerulean-400); border-radius:var(--r-sm); padding:10px 12px; font-size:11px; color:var(--fg-2); margin-bottom:16px; }
+  .note code { font-family:var(--font-mono); color:var(--cerulean-300); background:var(--bg-raised); padding:1px 5px; border-radius:3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>PrimeReact × Macro</h1>
+<div class="sub">Lara dark-blue base · Macro cerulean override</div>
+
+<div class="note">
+  This page renders Prime's own DOM class names with a compiled Prime theme and the Macro override layer on top — so you can verify the CSS-variable contract works without standing up a React runtime. In your React app, import the same two stylesheets (in this exact order) before your app bootstraps: <code>primereact/resources/themes/lara-dark-blue/theme.css</code>, then <code>./macro-theme.css</code>. Every PrimeReact component you render will inherit Macro tokens automatically. <i>Note — Lara is used as the base preset here because Aura in PrimeReact 10+ is distributed as a JS preset rather than a standalone CSS file; Macro's overrides hit the same CSS variables either way.</i>
+</div>
+
+<section>
+<h2>Buttons <span class="sub" style="margin:0">p-button · p-button-secondary · .macro-bid · .macro-ask</span></h2>
+<div class="row">
+  <button type="button" class="p-button p-component"><span class="p-button-label">Submit order</span></button>
+  <button type="button" class="p-button p-component p-button-outlined p-button-secondary"><span class="p-button-label">Cancel</span></button>
+  <button type="button" class="p-button p-component p-button-text"><span class="p-button-label">Reset</span></button>
+  <button type="button" class="p-button p-component macro-bid"><span class="p-button-label">Bid</span></button>
+  <button type="button" class="p-button p-component macro-ask"><span class="p-button-label">Ask</span></button>
+  <button type="button" class="p-button p-component p-button-sm"><i class="p-button-icon pi pi-plus"></i><span class="p-button-label">New RFQ</span></button>
+  <button type="button" class="p-button p-component p-button-danger"><span class="p-button-label">Halt trading</span></button>
+  <button type="button" class="p-button p-component" disabled><span class="p-button-label">Disabled</span></button>
+</div>
+</section>
+
+<section>
+<h2>Inputs</h2>
+<div class="row">
+  <input type="text" class="p-inputtext p-component" placeholder="Client…" style="width:180px">
+  <span class="p-inputnumber p-component p-inputnumber-buttons-horizontal">
+    <button class="p-button p-button-sm" style="min-width:28px">−</button>
+    <input class="p-inputnumber-input p-inputtext p-component" value="25 MM" style="width:80px;text-align:center">
+    <button class="p-button p-button-sm" style="min-width:28px">+</button>
+  </span>
+  <div class="p-dropdown p-component" style="width:180px;display:flex;align-items:center;padding:0 10px">
+    <span class="p-dropdown-label p-inputtext" style="border:0;background:transparent;padding:0">TradeWeb</span>
+    <span class="p-dropdown-trigger" style="margin-left:auto"><i class="pi pi-chevron-down" style="color:var(--fg-3)"></i></span>
+  </div>
+  <div class="p-multiselect p-component" style="width:220px;display:flex;align-items:center;padding:0 10px">
+    <span class="p-multiselect-label p-inputtext" style="border:0;background:transparent;padding:0">TradeWeb, BBG <span style="color:var(--fg-3)">+1</span></span>
+    <span class="p-multiselect-trigger" style="margin-left:auto"><i class="pi pi-chevron-down" style="color:var(--fg-3)"></i></span>
+  </div>
+  <label class="p-checkbox p-component" style="display:inline-flex;align-items:center;gap:8px">
+    <span class="p-checkbox-box p-highlight"><span class="p-checkbox-icon pi pi-check" style="color:var(--on-brand);font-size:10px"></span></span>
+    <span style="font-size:12px">Auto-refresh</span>
+  </label>
+</div>
+</section>
+
+<section>
+<h2>Tags · Chips · Badges</h2>
+<div class="row">
+  <span class="p-tag p-component p-tag-success">LIVE</span>
+  <span class="p-tag p-component p-tag-warning">PENDING</span>
+  <span class="p-tag p-component p-tag-danger">HALTED</span>
+  <span class="p-tag p-component p-tag-info">AFFIRMED</span>
+  <div class="p-chip p-component"><span class="p-chip-text">TradeWeb</span></div>
+  <div class="p-chip p-component"><span class="p-chip-text">10Y</span></div>
+  <div class="p-chip p-component"><span class="p-chip-text">SOFR</span></div>
+  <span style="position:relative;font-size:12px">Exceptions <span class="p-badge p-component p-badge-danger" style="margin-left:4px">14</span></span>
+  <span style="position:relative;font-size:12px">Orders <span class="p-badge p-component p-badge-info" style="margin-left:4px">12</span></span>
+</div>
+</section>
+
+<section>
+<h2>DataTable — blotter</h2>
+<div class="p-datatable p-component p-datatable-sm p-datatable-striped p-datatable-selectable">
+  <div class="p-datatable-wrapper">
+    <table role="grid" style="width:100%;border-collapse:collapse">
+      <thead class="p-datatable-thead">
+        <tr>
+          <th>Instrument</th><th>Bid</th><th>Mid</th><th>Ask</th><th>Size</th><th>Venue</th><th>State</th>
+        </tr>
+      </thead>
+      <tbody class="p-datatable-tbody">
+        <tr>
+          <td>USD 10Y SOFR</td>
+          <td class="mkt-num mkt-up">4.2370</td><td class="mkt-num">4.2385</td><td class="mkt-num mkt-down">4.2400</td>
+          <td class="mkt-num">25 MM</td><td>TradeWeb</td>
+          <td><span class="p-tag p-component p-tag-success">LIVE</span></td>
+        </tr>
+        <tr>
+          <td>USD 5Y SOFR</td>
+          <td class="mkt-num mkt-up">4.1112</td><td class="mkt-num">4.1130</td><td class="mkt-num mkt-down">4.1148</td>
+          <td class="mkt-num">50 MM</td><td>BBG</td>
+          <td><span class="p-tag p-component p-tag-success">LIVE</span></td>
+        </tr>
+        <tr aria-selected="true" class="p-highlight">
+          <td>EUR 10Y ESTR</td>
+          <td class="mkt-num mkt-up">2.3402</td><td class="mkt-num">2.3420</td><td class="mkt-num mkt-down">2.3438</td>
+          <td class="mkt-num">30 MM</td><td>TradeWeb</td>
+          <td><span class="p-tag p-component p-tag-success">LIVE</span></td>
+        </tr>
+        <tr>
+          <td>GBP 10Y SONIA</td>
+          <td class="mkt-num mkt-up">4.5108</td><td class="mkt-num">4.5124</td><td class="mkt-num mkt-down">4.5140</td>
+          <td class="mkt-num">10 MM</td><td>MTS</td>
+          <td><span class="p-tag p-component p-tag-danger">HALTED</span></td>
+        </tr>
+        <tr>
+          <td>UST 3.875 08/34</td>
+          <td class="mkt-num mkt-up">98.198</td><td class="mkt-num">98.202</td><td class="mkt-num mkt-down">98.206</td>
+          <td class="mkt-num">100 MM</td><td>BrokerTec</td>
+          <td><span class="p-tag p-component p-tag-success">LIVE</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+<section>
+<h2>Tabs</h2>
+<div class="p-tabview p-component">
+  <ul class="p-tabview-nav" role="tablist" style="display:flex;list-style:none;margin:0;padding:0">
+    <li class="p-highlight"><a class="p-tabview-nav-link" role="tab">Working <span class="p-badge p-component p-badge-info" style="margin-left:6px">12</span></a></li>
+    <li><a class="p-tabview-nav-link" role="tab">Filled <span style="color:var(--fg-3);font-family:var(--font-mono);margin-left:4px">284</span></a></li>
+    <li><a class="p-tabview-nav-link" role="tab">Cancelled</a></li>
+  </ul>
+  <div class="p-tabview-panels"><div class="p-tabview-panel" style="font-size:12px;color:var(--fg-2)">12 working orders · P&L +$238.4K · DV01 $14,821</div></div>
+</div>
+</section>
+
+<section>
+<h2>Messages</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
+  <div class="p-message p-component p-message-success" style="display:flex;align-items:center;gap:8px"><i class="pi pi-check-circle"></i><span>Order 8431 filled at 4.2385</span></div>
+  <div class="p-message p-component p-message-info"    style="display:flex;align-items:center;gap:8px"><i class="pi pi-info-circle"></i><span>RFQ sent to 3 dealers · TTL 30s</span></div>
+  <div class="p-message p-component p-message-warn"    style="display:flex;align-items:center;gap:8px"><i class="pi pi-exclamation-triangle"></i><span>Price tolerance exceeded on T-8428</span></div>
+  <div class="p-message p-component p-message-error"   style="display:flex;align-items:center;gap:8px"><i class="pi pi-times-circle"></i><span>KYC missing — order blocked</span></div>
+</div>
+</section>
+
+</div>
+</body>
+</html>

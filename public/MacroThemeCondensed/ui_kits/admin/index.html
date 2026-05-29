@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Macro · Admin</title>
+<link rel="icon" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../_shared/chrome.css">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="../_shared/chrome.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+const { Icon, TitleBar, TopNav, StatusBar, Panel } = Chrome;
+
+const USERS = [
+  { user:'jlin',   name:'Jenny Lin',     role:'Trader',        desk:'Rates-NY', limits:'$500M', status:'online', mfa:'yes' },
+  { user:'mhaq',   name:'Maya Haq',      role:'Sales Trader',  desk:'Sales-EMEA',limits:'$250M', status:'online', mfa:'yes' },
+  { user:'apatel', name:'Arjun Patel',   role:'Trader',        desk:'Rates-LDN', limits:'$500M', status:'offline',mfa:'yes' },
+  { user:'rkhan',  name:'Rashid Khan',   role:'Middle Office', desk:'MO-EMEA',   limits:'—',     status:'online', mfa:'yes' },
+  { user:'skim',   name:'Soo Kim',       role:'Risk',          desk:'Risk',      limits:'—',     status:'online', mfa:'no'  },
+  { user:'dweiss', name:'Daniel Weiss',  role:'Admin',         desk:'Tech',      limits:'—',     status:'online', mfa:'yes' },
+];
+
+const VENUES = [
+  { v:'TradeWeb',   conn:'FIX 4.4', state:'up',   lat:'12ms', sess:'MACRO→TW-01'},
+  { v:'Bloomberg',  conn:'BLPAPI',  state:'up',   lat:'18ms', sess:'MACRO-BLP'},
+  { v:'MarketAxess',conn:'FIX 4.4', state:'up',   lat:'22ms', sess:'MACRO→MAX-02'},
+  { v:'MTS',        conn:'FIX 4.4', state:'degraded', lat:'148ms', sess:'MACRO→MTS-01'},
+  { v:'BrokerTec',  conn:'FIX 5.0', state:'up',   lat:'9ms',  sess:'MACRO→BT-03'},
+  { v:'CME',        conn:'iLink',   state:'up',   lat:'4ms',  sess:'MACRO-CME'},
+  { v:'Eurex',      conn:'ETI',     state:'down', lat:'—',    sess:'MACRO-EUR-01'},
+  { v:'360T',       conn:'FIX 4.4', state:'up',   lat:'31ms', sess:'MACRO→360T'},
+];
+
+function App() {
+  const [tab, setTab] = useState('users');
+  return (
+    <div id="root" style={{height:'100%',display:'flex',flexDirection:'column'}}>
+      <TitleBar title="Macro · Admin · dweiss@tech" />
+      <TopNav
+        tabs={[{id:'users',label:'Users',count:124},{id:'venues',label:'Venues',count:8},{id:'limits',label:'Limits'},{id:'entitle',label:'Entitlements'},{id:'audit',label:'Audit log'}]}
+        active={tab} onTab={setTab}
+      />
+      <div className="content">
+        {tab==='venues' ? (
+          <Panel title="Venue connectivity" actions={<><button className="btn btn-xs"><Icon name="refresh-cw" size={10}/> Reconnect</button><button className="btn btn-xs btn-primary"><Icon name="plus" size={10}/> Add venue</button></>}>
+            <table className="grid">
+              <thead><tr><th>Venue</th><th>Protocol</th><th>State</th><th>Latency</th><th>Session</th><th></th></tr></thead>
+              <tbody>
+                {VENUES.map(v=>(
+                  <tr key={v.v}>
+                    <td style={{fontWeight:500}}>{v.v}</td>
+                    <td className="muted">{v.conn}</td>
+                    <td>
+                      {v.state==='up'&&<span className="badge badge-live"><span className="dot"/>Up</span>}
+                      {v.state==='degraded'&&<span className="badge badge-pending"><span className="dot"/>Degraded</span>}
+                      {v.state==='down'&&<span className="badge badge-halted"><span className="dot"/>Down</span>}
+                    </td>
+                    <td className="mono num-r" style={{textAlign:'left'}}>{v.lat}</td>
+                    <td className="mono muted">{v.sess}</td>
+                    <td><button className="btn btn-xs">Logs</button> <button className="btn btn-xs btn-ghost">Cycle</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Panel>
+        ) : (
+          <Panel title="Users & entitlements" actions={<><input placeholder="Search…" style={{width:180}}/><button className="btn btn-xs btn-primary"><Icon name="plus" size={10}/> New user</button></>}>
+            <table className="grid">
+              <thead><tr><th>User</th><th>Name</th><th>Role</th><th>Desk</th><th className="num-r">Limits</th><th>MFA</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {USERS.map(u=>(
+                  <tr key={u.user}>
+                    <td className="mono" style={{fontWeight:500}}>{u.user}</td>
+                    <td>{u.name}</td>
+                    <td><span className="tag">{u.role}</span></td>
+                    <td className="muted">{u.desk}</td>
+                    <td className="num-r">{u.limits}</td>
+                    <td>{u.mfa==='yes' ? <span className="badge badge-live"><span className="dot"/>On</span> : <span className="badge badge-halted"><span className="dot"/>Off</span>}</td>
+                    <td>{u.status==='online'?<span className="badge badge-live"><span className="dot"/>Online</span>:<span className="badge badge-cancelled"><span className="dot"/>Offline</span>}</td>
+                    <td><button className="btn btn-xs">Edit</button> <button className="btn btn-xs btn-ghost">Revoke</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Panel>
+        )}
+      </div>
+      <StatusBar items={['admin-console','role: SysAdmin']} />
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

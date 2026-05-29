@@ -16,7 +16,14 @@
           </span>
         }
       </div>
-      <button class="disconnect-btn" (click)="onDisconnect()">Disconnect</button>
+      <div class="header-actions">
+        <div class="density-toggle" role="group" aria-label="Grid density">
+          <button class="density-btn" [class.active]="density() === 'tiny'" (click)="setDensity('tiny')">Tiny</button>
+          <button class="density-btn" [class.active]="density() === 'dense'" (click)="setDensity('dense')">Dense</button>
+          <button class="density-btn" [class.active]="density() === 'cozy'" (click)="setDensity('cozy')">Cozy</button>
+        </div>
+        <button class="disconnect-btn" (click)="onDisconnect()">Disconnect</button>
+      </div>
     </header>
 
     <main class="grid-container">
@@ -28,6 +35,8 @@
         @if (useViewport()) {
           <!-- Viewport Row Model - for large datasets with server-side sorting -->
           <ag-grid-angular
+            class="macro-condensed-grid"
+            [attr.data-density]="density()"
             [theme]="theme"
             [columnDefs]="columnDefs()"
             [defaultColDef]="defaultColDef"
@@ -42,6 +51,8 @@
         } @else {
           <!-- Client-Side Row Model - with transactions for updates -->
           <ag-grid-angular
+            class="macro-condensed-grid"
+            [attr.data-density]="density()"
             [theme]="theme"
             [rowData]="rowData()"
             [columnDefs]="columnDefs()"

@@ -3,7 +3,7 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
+  background: var(--bg-app);
 }
 
 .header {
@@ -11,19 +11,19 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  background: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-1);
 
   .header-info {
     h1 {
       margin: 0;
       font-size: 24px;
-      color: #333;
+      color: var(--fg-1);
     }
 
     .connection-details {
       font-size: 14px;
-      color: #666;
+      color: var(--fg-2);
       margin-top: 4px;
       display: block;
 
@@ -36,21 +36,60 @@
         margin-left: 8px;
 
         &.viewport {
-          background: #e3f2fd;
-          color: #1565c0;
+          background: var(--status-info-bg);
+          color: var(--status-info);
         }
 
         &.client-side {
-          background: #e8f5e9;
-          color: #2e7d32;
+          background: var(--status-ok-bg);
+          color: var(--status-ok);
         }
+      }
+    }
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .density-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    background: var(--bg-canvas);
+
+    .density-btn {
+      border: 1px solid var(--border-1);
+      background: transparent;
+      color: var(--fg-2);
+      height: var(--h-control-sm);
+      padding: 0 var(--space-4);
+      border-radius: var(--radius-sm);
+      font-size: var(--fs-11);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+
+      &:hover {
+        border-color: var(--brand);
+        color: var(--fg-1);
+      }
+
+      &.active {
+        border-color: var(--brand);
+        background: var(--brand-soft);
+        color: var(--brand-hover);
       }
     }
   }
 
   .disconnect-btn {
     padding: 10px 20px;
-    background: #dc3545;
+    background: var(--status-error);
     color: white;
     border: none;
     border-radius: 6px;
@@ -59,19 +98,53 @@
     transition: background 0.2s;
 
     &:hover {
-      background: #c82333;
+      background: var(--red-500);
     }
   }
 }
 
 .grid-container {
   flex: 1;
-  padding: 24px;
+  padding: var(--space-6);
   overflow: hidden;
 
   ag-grid-angular {
     width: 100%;
     height: 100%;
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .macro-condensed-grid {
+    // Marker class for Macro-specific AG Grid overrides loaded from public assets.
+  }
+
+  .macro-condensed-grid[data-density='tiny'] {
+    --ag-row-height: 18px;
+    --ag-header-height: 22px;
+    --ag-list-item-height: 18px;
+    --ag-font-size: 10px;
+    --ag-grid-size: 3px;
+    --ag-cell-horizontal-padding: 6px;
+  }
+
+  .macro-condensed-grid[data-density='dense'] {
+    --ag-row-height: 22px;
+    --ag-header-height: 28px;
+    --ag-list-item-height: 22px;
+    --ag-font-size: 12px;
+    --ag-grid-size: 5px;
+    --ag-cell-horizontal-padding: 10px;
+  }
+
+  .macro-condensed-grid[data-density='cozy'] {
+    --ag-row-height: 32px;
+    --ag-header-height: 36px;
+    --ag-list-item-height: 32px;
+    --ag-font-size: 13px;
+    --ag-grid-size: 7px;
+    --ag-cell-horizontal-padding: 12px;
   }
 }
 
@@ -85,12 +158,13 @@
 }
 
 .loading {
-  color: #666;
+  color: var(--fg-2);
 }
 
 .error {
-  color: #dc3545;
-  background: #fee;
+  color: var(--status-error);
+  background: var(--status-error-bg);
+  border: 1px solid var(--red-600);
   border-radius: 8px;
   padding: 24px;
 }

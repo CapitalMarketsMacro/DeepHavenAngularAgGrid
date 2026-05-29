@@ -1,0 +1,300 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Macro · Workspace</title>
+<link rel="icon" href="assets/favicon.svg">
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; background:var(--bg-canvas); color:var(--fg-1); font-family:var(--font-sans); overflow:hidden; }
+  html { height:100dvh; } body { height:100dvh; }
+
+  /* Top bar */
+  .topbar { height:34px; background:linear-gradient(180deg,#15181f,#0f1218); border-bottom:1px solid var(--border-1); display:flex; align-items:center; padding:0 12px; gap:14px; user-select:none; -webkit-app-region:drag; }
+  .topbar img { width:18px; height:18px }
+  .topbar .brand { font-size:12px; font-weight:600; letter-spacing:-0.01em; }
+  .topbar .brand small { color:var(--fg-3); font-weight:400; margin-left:8px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; }
+  .topbar .spacer { flex:1 }
+  .topbar .preset { -webkit-app-region:no-drag; display:flex; gap:4px; align-items:center }
+  .topbar .preset button { background:transparent; border:1px solid var(--border-1); color:var(--fg-2); font-family:var(--font-sans); font-size:11px; padding:3px 9px; border-radius:4px; cursor:pointer; letter-spacing:.02em; }
+  .topbar .preset button:hover { color:var(--fg-1); border-color:var(--border-2); background:var(--bg-raised); }
+  .topbar .preset button.active { color:var(--cerulean-300); border-color:var(--cerulean-500); background:rgba(42,166,230,0.08); }
+  .topbar .live { -webkit-app-region:no-drag; display:flex; gap:6px; align-items:center; font-size:10px; color:var(--fg-3); letter-spacing:.06em; text-transform:uppercase; }
+  .topbar .live::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--green-400); box-shadow:0 0 6px var(--green-400); animation:pulse 1.6s linear infinite; }
+  @keyframes pulse { 50%{opacity:.4} }
+
+  /* Workspace grid */
+  .workspace {
+    --c1: 1fr; --c2: 1fr; --c3: 1fr;
+    --r1: 1fr; --r2: 1fr;
+    height: calc(100dvh - 34px);
+    width: 100%;
+    display: grid;
+    grid-template-columns: var(--c1) 5px var(--c2) 5px var(--c3);
+    grid-template-rows:    var(--r1) 5px var(--r2);
+    background: var(--bg-canvas);
+  }
+  .pane { background:var(--bg-panel); border:1px solid var(--border-1); display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+  .pane:hover { border-color:var(--border-2); }
+  .pane:focus-within { border-color:var(--cerulean-600); }
+
+  .pane-head { height:24px; flex:0 0 24px; background:var(--bg-raised); border-bottom:1px solid var(--border-1); display:flex; align-items:center; padding:0 6px 0 8px; gap:6px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--fg-3); user-select:none; }
+  .pane-head .dot { width:6px; height:6px; border-radius:50%; background:var(--cerulean-400); flex-shrink:0; }
+  .pane-head select { background:transparent; border:0; color:var(--fg-1); font-family:var(--font-sans); font-size:11px; letter-spacing:.04em; text-transform:none; flex:1; min-width:0; padding:2px 4px; cursor:pointer; outline:none; appearance:none; }
+  .pane-head select:focus { color:var(--cerulean-300); }
+  .pane-head select option { background:var(--bg-panel); color:var(--fg-1); text-transform:none; }
+  .pane-head .iconbtn { background:transparent; border:0; color:var(--fg-3); cursor:pointer; padding:2px 5px; border-radius:3px; font-size:11px; line-height:1; font-family:var(--font-mono); }
+  .pane-head .iconbtn:hover { color:var(--fg-1); background:var(--bg-grid-hover); }
+
+  .pane-body { flex:1; min-height:0; position:relative; background:var(--bg-app); }
+  .pane-body iframe { width:100%; height:100%; border:0; display:block; background:var(--bg-app); }
+  .pane-body.empty { display:flex; align-items:center; justify-content:center; color:var(--fg-3); font-size:11px; letter-spacing:.06em; text-transform:uppercase; }
+
+  /* Splitters */
+  .splitter { background: transparent; position:relative; z-index:5; }
+  .splitter::before { content:''; position:absolute; inset:0; background:var(--border-1); transition:background 80ms linear; }
+  .splitter:hover::before, .splitter.dragging::before { background:var(--cerulean-500); }
+  .vsplit { cursor: col-resize; }
+  .hsplit { cursor: row-resize; }
+  .vsplit::after { content:''; position:absolute; left:50%; top:50%; width:2px; height:24px; transform:translate(-50%,-50%); background:var(--fg-4); opacity:.6; border-radius:2px; }
+  .hsplit::after { content:''; position:absolute; left:50%; top:50%; width:24px; height:2px; transform:translate(-50%,-50%); background:var(--fg-4); opacity:.6; border-radius:2px; }
+
+  /* While dragging — disable iframe pointer events globally */
+  .workspace.is-dragging iframe { pointer-events:none; }
+  .workspace.is-dragging { cursor: inherit; }
+
+  /* Pane positions */
+  .p11 { grid-column:1; grid-row:1 } .p12 { grid-column:3; grid-row:1 } .p13 { grid-column:5; grid-row:1 }
+  .p21 { grid-column:1; grid-row:3 } .p22 { grid-column:3; grid-row:3 } .p23 { grid-column:5; grid-row:3 }
+  .v1  { grid-column:2; grid-row:1 / span 3 }
+  .v2  { grid-column:4; grid-row:1 / span 3 }
+  .h1  { grid-column:1 / span 5; grid-row:2 }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <img src="assets/favicon.svg" alt="">
+  <div class="brand">MACRO <small>WORKSPACE</small></div>
+  <div class="preset">
+    <button data-preset="kits" class="active">Trading floor</button>
+    <button data-preset="themes">Theme storybooks</button>
+    <button data-preset="solo">Single window</button>
+    <button data-preset="reset">↺ Reset</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="live">Live · drag any divider</div>
+</div>
+
+<div class="workspace" id="ws">
+  <div class="pane p11"><div class="pane-head"><span class="dot"></span><select data-pane="0"></select><button class="iconbtn" data-act="open" title="Open in new tab">↗</button><button class="iconbtn" data-act="reload" title="Reload">↻</button></div><div class="pane-body"><iframe data-iframe="0"></iframe></div></div>
+  <div class="splitter vsplit v1" data-split="col" data-idx="1"></div>
+  <div class="pane p12"><div class="pane-head"><span class="dot"></span><select data-pane="1"></select><button class="iconbtn" data-act="open">↗</button><button class="iconbtn" data-act="reload">↻</button></div><div class="pane-body"><iframe data-iframe="1"></iframe></div></div>
+  <div class="splitter vsplit v2" data-split="col" data-idx="2"></div>
+  <div class="pane p13"><div class="pane-head"><span class="dot"></span><select data-pane="2"></select><button class="iconbtn" data-act="open">↗</button><button class="iconbtn" data-act="reload">↻</button></div><div class="pane-body"><iframe data-iframe="2"></iframe></div></div>
+
+  <div class="splitter hsplit h1" data-split="row" data-idx="1"></div>
+
+  <div class="pane p21"><div class="pane-head"><span class="dot"></span><select data-pane="3"></select><button class="iconbtn" data-act="open">↗</button><button class="iconbtn" data-act="reload">↻</button></div><div class="pane-body"><iframe data-iframe="3"></iframe></div></div>
+  <div class="pane p22"><div class="pane-head"><span class="dot"></span><select data-pane="4"></select><button class="iconbtn" data-act="open">↗</button><button class="iconbtn" data-act="reload">↻</button></div><div class="pane-body"><iframe data-iframe="4"></iframe></div></div>
+  <div class="pane p23"><div class="pane-head"><span class="dot"></span><select data-pane="5"></select><button class="iconbtn" data-act="open">↗</button><button class="iconbtn" data-act="reload">↻</button></div><div class="pane-body"><iframe data-iframe="5"></iframe></div></div>
+</div>
+
+<script>
+const PAGES = [
+  { group:'UI Kits', items:[
+    { id:'blotter',     label:'Rates Blotter',         href:'ui_kits/rates-blotter/index.html' },
+    { id:'ticket',      label:'Order Ticket / RFQ',    href:'ui_kits/order-ticket/index.html' },
+    { id:'cockpit',     label:'Sales Cockpit',         href:'ui_kits/sales-cockpit/index.html' },
+    { id:'mo',          label:'Middle Office',         href:'ui_kits/middle-office/index.html' },
+    { id:'analytics',   label:'Analytics',             href:'ui_kits/analytics/index.html' },
+    { id:'admin',       label:'Admin / Permissions',   href:'ui_kits/admin/index.html' },
+  ]},
+  { group:'Themes', items:[
+    { id:'themes',      label:'Themes — Landing',      href:'themes/index.html' },
+    { id:'aggrid',      label:'AG Grid v33 storybook', href:'themes/ag-grid/preview.html' },
+    { id:'primeng',     label:'PrimeNG storybook',     href:'themes/primeng/preview.html' },
+    { id:'primerx',     label:'PrimeReact storybook',  href:'themes/primereact/preview.html' },
+  ]},
+  { group:'Foundations', items:[
+    { id:'demo',        label:'Bundle demo (dist/)',   href:'dist/demo.html' },
+    { id:'cards-buttons',  label:'Components — Buttons',     href:'preview/component-buttons.html' },
+    { id:'cards-inputs',   label:'Components — Inputs',      href:'preview/component-inputs.html' },
+    { id:'cards-grid',     label:'Components — Grid',        href:'preview/component-grid.html' },
+    { id:'cards-badges',   label:'Components — Badges',      href:'preview/component-badges.html' },
+    { id:'cards-tabs',     label:'Components — Tabs/Menu',   href:'preview/component-tabs-menu.html' },
+    { id:'cards-ticket',   label:'Components — Ticket',      href:'preview/component-ticket.html' },
+    { id:'cards-brand',    label:'Brand — Logo',             href:'preview/brand-logo.html' },
+    { id:'cards-display',  label:'Type — Display',           href:'preview/type-display.html' },
+    { id:'cards-body',     label:'Type — Body',              href:'preview/type-body.html' },
+    { id:'cards-mono',     label:'Type — Mono',              href:'preview/type-mono.html' },
+    { id:'cards-neutral',  label:'Colors — Neutrals',        href:'preview/colors-neutrals.html' },
+    { id:'cards-brandc',   label:'Colors — Brand',           href:'preview/colors-brand.html' },
+    { id:'cards-market',   label:'Colors — Market',          href:'preview/colors-market.html' },
+    { id:'cards-status',   label:'Colors — Status',          href:'preview/colors-status.html' },
+    { id:'cards-light',    label:'Colors — Light theme',     href:'preview/colors-light.html' },
+    { id:'cards-spacing',  label:'Spacing — Scale',          href:'preview/spacing-scale.html' },
+    { id:'cards-radii',    label:'Spacing — Radii/Shadow',   href:'preview/spacing-radii-shadow.html' },
+    { id:'cards-motion',   label:'Spacing — Motion',         href:'preview/spacing-motion.html' },
+  ]},
+];
+
+const FLAT = PAGES.flatMap(g => g.items);
+const byId = id => FLAT.find(p => p.id === id);
+
+const PRESETS = {
+  kits:   ['blotter','cockpit','ticket','mo','analytics','admin'],
+  themes: ['themes','aggrid','primeng','primerx','cards-buttons','cards-grid'],
+  solo:   ['blotter',null,null,null,null,null],
+  reset:  ['blotter','cockpit','ticket','mo','analytics','admin'],
+};
+
+// Populate selects
+document.querySelectorAll('select[data-pane]').forEach(sel => {
+  PAGES.forEach(g => {
+    const og = document.createElement('optgroup'); og.label = g.group;
+    g.items.forEach(p => {
+      const o = document.createElement('option'); o.value = p.id; o.textContent = p.label; og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  sel.addEventListener('change', e => loadPane(+sel.dataset.pane, sel.value));
+});
+
+function loadPane(idx, id) {
+  const iframe = document.querySelector(`iframe[data-iframe="${idx}"]`);
+  const sel = document.querySelector(`select[data-pane="${idx}"]`);
+  const body = iframe.parentElement;
+  if (!id) { iframe.removeAttribute('src'); body.classList.add('empty'); body.innerHTML = '<iframe data-iframe="'+idx+'"></iframe><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--fg-3);font-size:11px;letter-spacing:.06em;text-transform:uppercase">— empty —</div>'; sel.value=''; return; }
+  const p = byId(id); if (!p) return;
+  body.classList.remove('empty');
+  // Restore iframe if it was replaced
+  if (!body.querySelector('iframe')) body.innerHTML = '<iframe data-iframe="'+idx+'"></iframe>';
+  body.querySelector('iframe').src = p.href;
+  sel.value = id;
+  saveState();
+}
+
+function applyPreset(name) {
+  const list = PRESETS[name] || PRESETS.kits;
+  list.forEach((id, i) => loadPane(i, id));
+  if (name !== 'reset') {
+    document.querySelectorAll('.preset button').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+  } else {
+    // Reset divider positions too
+    const ws = document.getElementById('ws');
+    ws.style.setProperty('--c1','1fr'); ws.style.setProperty('--c2','1fr'); ws.style.setProperty('--c3','1fr');
+    ws.style.setProperty('--r1','1fr'); ws.style.setProperty('--r2','1fr');
+    document.querySelector('.preset button[data-preset="kits"]').classList.add('active');
+    document.querySelectorAll('.preset button:not([data-preset="kits"])').forEach(b => b.classList.remove('active'));
+  }
+  saveState();
+}
+
+document.querySelectorAll('.preset button').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+
+// Iconbar buttons
+document.querySelectorAll('.iconbtn').forEach(btn => btn.addEventListener('click', e => {
+  const head = btn.closest('.pane-head');
+  const sel = head.querySelector('select');
+  const id = sel.value; if (!id) return;
+  const p = byId(id); if (!p) return;
+  const act = btn.dataset.act;
+  if (act === 'open') window.open(p.href, '_blank');
+  if (act === 'reload') {
+    const iframe = head.parentElement.querySelector('iframe');
+    if (iframe) { const s = iframe.src; iframe.src = ''; setTimeout(() => iframe.src = s, 30); }
+  }
+}));
+
+// Splitter drag
+const ws = document.getElementById('ws');
+function startDrag(e, splitter) {
+  e.preventDefault();
+  splitter.classList.add('dragging');
+  ws.classList.add('is-dragging');
+  const isCol = splitter.dataset.split === 'col';
+  const idx = +splitter.dataset.idx; // col 1 => between c1/c2; col 2 => c2/c3
+  const rect = ws.getBoundingClientRect();
+
+  function move(ev) {
+    if (isCol) {
+      // total width minus the two 5px gutters
+      const usable = rect.width - 10;
+      const x = Math.max(120, Math.min(rect.width - 120, ev.clientX - rect.left));
+      // need to recompute current pixel widths from CSS vars; simpler: derive from current computed grid template
+      const cs = getComputedStyle(ws).gridTemplateColumns.split(' ').map(parseFloat);
+      // cs = [c1, gut, c2, gut, c3]
+      let c1 = cs[0], c2 = cs[2], c3 = cs[4];
+      if (idx === 1) {
+        // adjust c1 vs c2; preserve c3
+        const combined = c1 + c2;
+        c1 = Math.max(120, Math.min(combined - 120, x));
+        c2 = combined - c1;
+      } else {
+        // adjust c2 vs c3; preserve c1
+        const combined = c2 + c3;
+        const localX = x - c1 - 5;
+        c2 = Math.max(120, Math.min(combined - 120, localX));
+        c3 = combined - c2;
+      }
+      ws.style.setProperty('--c1', c1 + 'px');
+      ws.style.setProperty('--c2', c2 + 'px');
+      ws.style.setProperty('--c3', c3 + 'px');
+    } else {
+      const y = Math.max(80, Math.min(rect.height - 80, ev.clientY - rect.top));
+      const cs = getComputedStyle(ws).gridTemplateRows.split(' ').map(parseFloat);
+      let r1 = cs[0], r2 = cs[2];
+      const combined = r1 + r2;
+      r1 = Math.max(80, Math.min(combined - 80, y));
+      r2 = combined - r1;
+      ws.style.setProperty('--r1', r1 + 'px');
+      ws.style.setProperty('--r2', r2 + 'px');
+    }
+  }
+  function up() {
+    splitter.classList.remove('dragging');
+    ws.classList.remove('is-dragging');
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    saveState();
+  }
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+}
+document.querySelectorAll('.splitter').forEach(s => s.addEventListener('mousedown', e => startDrag(e, s)));
+
+// Double-click splitter to reset that axis
+document.querySelectorAll('.splitter').forEach(s => s.addEventListener('dblclick', () => {
+  if (s.dataset.split === 'col') {
+    ws.style.setProperty('--c1','1fr'); ws.style.setProperty('--c2','1fr'); ws.style.setProperty('--c3','1fr');
+  } else {
+    ws.style.setProperty('--r1','1fr'); ws.style.setProperty('--r2','1fr');
+  }
+  saveState();
+}));
+
+// Persist state
+function saveState() {
+  try {
+    const sels = [...document.querySelectorAll('select[data-pane]')].map(s => s.value);
+    const cs = getComputedStyle(ws);
+    const cols = cs.gridTemplateColumns.split(' ').map(parseFloat);
+    const rows = cs.gridTemplateRows.split(' ').map(parseFloat);
+    localStorage.setItem('macro-ws', JSON.stringify({ sels, cols:[cols[0],cols[2],cols[4]], rows:[rows[0],rows[2]] }));
+  } catch(e) {}
+}
+function restoreState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('macro-ws')||'null');
+    if (!s) { applyPreset('kits'); return; }
+    s.sels.forEach((id, i) => loadPane(i, id));
+    if (s.cols) { ws.style.setProperty('--c1', s.cols[0]+'px'); ws.style.setProperty('--c2', s.cols[1]+'px'); ws.style.setProperty('--c3', s.cols[2]+'px'); }
+    if (s.rows) { ws.style.setProperty('--r1', s.rows[0]+'px'); ws.style.setProperty('--r2', s.rows[1]+'px'); }
+  } catch(e) { applyPreset('kits'); }
+}
+restoreState();
+</script>
+
+</body>
+</html>

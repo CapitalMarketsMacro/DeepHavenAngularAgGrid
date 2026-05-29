@@ -1,4 +1,4 @@
-import { Component, computed, inject, ViewChild, OnInit, OnDestroy } from '@angular/core';
+import { Component, computed, inject, signal, ViewChild, OnInit, OnDestroy } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { AgGridAngular } from 'ag-grid-angular';
 import {
@@ -7,6 +7,7 @@ import {
   GridApi,
   themeQuartz,
   colorSchemeDarkBlue,
+  iconSetMaterial,
   GetRowIdParams,
   IViewportDatasource,
   SortChangedEvent,
@@ -38,6 +39,7 @@ export class App implements OnInit, OnDestroy {
   readonly viewportDatasource = this.deephavenService.viewportDatasource;
 
   connectionInfo: ConnectionConfig | null = null;
+  readonly density = signal<'tiny' | 'dense' | 'cozy'>('dense');
 
   // Row model type based on config
   readonly rowModelType = computed(() => {
@@ -82,7 +84,48 @@ export class App implements OnInit, OnDestroy {
     floatingFilter: true
   };
 
-  readonly theme = themeQuartz.withPart(colorSchemeDarkBlue);
+  readonly theme = themeQuartz
+    .withPart(iconSetMaterial)
+    .withPart(colorSchemeDarkBlue)
+    .withParams({
+      // Mirrors public/MacroThemeCondensed/themes/ag-grid/macro-theme.js
+      backgroundColor: '#12141a',
+      foregroundColor: '#e6e8ec',
+      chromeBackgroundColor: '#181b22',
+      headerBackgroundColor: '#181b22',
+      headerTextColor: '#6f7687',
+      borderColor: '#1c2029',
+      wrapperBorderRadius: 0,
+      rowBorder: { style: 'solid', width: 1, color: '#1c2029' },
+      columnBorder: { style: 'none' },
+      oddRowBackgroundColor: '#181b22',
+      rowHoverColor: '#22262f',
+      selectedRowBackgroundColor: '#1a2a3f',
+      fontFamily: "'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace",
+      fontSize: 12,
+      headerFontFamily: "'Roboto', system-ui, sans-serif",
+      headerFontSize: 10,
+      headerFontWeight: 500,
+      cellHorizontalPadding: 10,
+      rowHeight: 22,
+      headerHeight: 28,
+      listItemHeight: 22,
+      accentColor: '#2aa6e6',
+      focusShadow: '0 0 0 2px #12141a, 0 0 0 4px #2aa6e6',
+      rangeSelectionBackgroundColor: 'rgba(42,166,230,0.14)',
+      rangeSelectionBorderColor: '#2aa6e6',
+      checkboxCheckedBackgroundColor: '#2aa6e6',
+      checkboxCheckedBorderColor: '#2aa6e6',
+      inputBackgroundColor: '#12141a',
+      inputBorder: { style: 'solid', width: 1, color: '#363c48' },
+      inputFocusBorder: { style: 'solid', width: 1, color: '#2aa6e6' },
+      menuBackgroundColor: '#1e222a',
+      menuBorder: { style: 'solid', width: 1, color: '#363c48' },
+      menuShadow: '0 4px 16px rgba(0,0,0,0.40)',
+      tooltipBackgroundColor: '#1e222a',
+      tooltipTextColor: '#e6e8ec',
+      tooltipBorder: { style: 'solid', width: 1, color: '#363c48' }
+    });
 
   // Row ID function for ag-Grid to identify rows for updates
   getRowId = (params: GetRowIdParams): string => {
@@ -212,5 +255,9 @@ export class App implements OnInit, OnDestroy {
   onDisconnect(): void {
     this.deephavenService.disconnect();
     this.connectionInfo = null;
+  }
+
+  setDensity(next: 'tiny' | 'dense' | 'cozy'): void {
+    this.density.set(next);
   }
 }

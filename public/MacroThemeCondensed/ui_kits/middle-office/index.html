@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Macro · Middle Office</title>
+<link rel="icon" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../_shared/chrome.css">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="../_shared/chrome.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+const { Icon, TitleBar, TopNav, StatusBar, Panel } = Chrome;
+
+const EXCEPTIONS = [
+  { id:'EX-19241', type:'Price tolerance',  inst:'USD 10Y SOFR',    trader:'jlin',  client:'Citadel',   size:'25MM', age:'00:04:22', sev:'error' },
+  { id:'EX-19240', type:'Missing allocation',inst:'DBR 2.1 02/34',  trader:'mhaq',  client:'Bridgewater',size:'50MM',age:'00:08:14', sev:'error' },
+  { id:'EX-19239', type:'Counterparty KYC', inst:'UST 3.875 08/34', trader:'jlin',  client:'Point72',   size:'100MM',age:'00:12:08',sev:'warn' },
+  { id:'EX-19238', type:'Settlement cutoff',inst:'EUR 5Y ESTR',     trader:'apatel',client:'Man AHL',   size:'30MM', age:'00:22:18',sev:'warn' },
+  { id:'EX-19237', type:'Trade affirmation',inst:'GBP 10Y SONIA',   trader:'mhaq',  client:'Brevan',    size:'10MM', age:'00:38:02',sev:'info' },
+  { id:'EX-19236', type:'Rate reset',       inst:'USD 3M Libor',    trader:'system',client:'—',         size:'—',    age:'01:12:44',sev:'info' },
+];
+
+const TRADES = [
+  { id:'T-8431', inst:'USD 10Y SOFR',side:'Buy',  size:'25MM', price:'4.2380',client:'Citadel',   venue:'TradeWeb',state:'affirmed'},
+  { id:'T-8430', inst:'DBR 2.1 02/34',side:'Sell',size:'50MM', price:'99.45', client:'Bridgewater',venue:'MTS',     state:'pending' },
+  { id:'T-8429', inst:'UST 3.875 08/34',side:'Buy',size:'100MM',price:'98.20',client:'Point72',   venue:'BrokerTec',state:'affirmed'},
+  { id:'T-8428', inst:'EUR 10Y ESTR',side:'Buy', size:'30MM', price:'2.3420',client:'Man AHL',   venue:'TradeWeb',state:'cleared'},
+  { id:'T-8427', inst:'GBP 5Y SONIA',side:'Sell',size:'10MM', price:'4.0200',client:'Brevan',    venue:'BBG',     state:'failed' },
+];
+
+function ExceptionQueue() {
+  return (
+    <Panel title="Exceptions queue" actions={<>
+      <button className="btn btn-xs">Unassigned <span className="muted mono" style={{marginLeft:4}}>14</span></button>
+      <button className="btn btn-xs btn-ghost">Mine <span className="muted mono" style={{marginLeft:4}}>6</span></button>
+      <button className="btn btn-xs btn-ghost">All</button>
+    </>}>
+      <table className="grid">
+        <thead><tr>
+          <th>Sev</th><th>ID</th><th>Type</th><th>Instrument</th><th>Trader</th><th>Client</th>
+          <th className="num-r">Size</th><th>Age</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          {EXCEPTIONS.map(e=>(
+            <tr key={e.id} className={e.sev==='error'?'selected':''}>
+              <td>
+                {e.sev==='error' && <span className="badge badge-halted"><span className="dot"/>Error</span>}
+                {e.sev==='warn'  && <span className="badge badge-pending"><span className="dot"/>Warn</span>}
+                {e.sev==='info'  && <span className="badge badge-info"><span className="dot"/>Info</span>}
+              </td>
+              <td style={{fontWeight:500}}>{e.id}</td>
+              <td>{e.type}</td>
+              <td>{e.inst}</td>
+              <td className="muted">{e.trader}</td>
+              <td className="muted">{e.client}</td>
+              <td className="num-r">{e.size}</td>
+              <td className="mono muted">{e.age}</td>
+              <td>
+                <button className="btn btn-xs btn-primary">Resolve</button>{' '}
+                <button className="btn btn-xs">Escalate</button>{' '}
+                <button className="btn btn-xs btn-ghost">Detail</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
+function TradeCapture() {
+  return (
+    <Panel title="Trade capture · today" actions={<button className="btn btn-xs"><Icon name="download" size={10}/> Export</button>}>
+      <table className="grid">
+        <thead><tr>
+          <th>ID</th><th>Instrument</th><th>Side</th>
+          <th className="num-r">Size</th><th className="num-r">Price</th>
+          <th>Client</th><th>Venue</th><th>State</th>
+        </tr></thead>
+        <tbody>
+          {TRADES.map(t=>(
+            <tr key={t.id}>
+              <td style={{fontWeight:500}}>{t.id}</td>
+              <td>{t.inst}</td>
+              <td className={t.side==='Buy'?'up':'down'}>{t.side}</td>
+              <td className="num-r">{t.size}</td>
+              <td className="num-r">{t.price}</td>
+              <td>{t.client}</td>
+              <td className="muted">{t.venue}</td>
+              <td>
+                {t.state==='affirmed'&&<span className="badge badge-filled"><span className="dot"/>Affirmed</span>}
+                {t.state==='cleared'&&<span className="badge badge-filled"><span className="dot"/>Cleared</span>}
+                {t.state==='pending'&&<span className="badge badge-pending"><span className="dot"/>Pending</span>}
+                {t.state==='failed'&&<span className="badge badge-halted"><span className="dot"/>Failed</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
+function App() {
+  return (
+    <div id="root" style={{height:'100%',display:'flex',flexDirection:'column'}}>
+      <TitleBar title="Macro · Middle Office · mo-rkhan@desk-3" />
+      <TopNav
+        tabs={[{id:'exc',label:'Exceptions',count:14},{id:'cap',label:'Trade capture'},{id:'alloc',label:'Allocations'},{id:'settle',label:'Settlement'}]}
+        active="exc"
+      />
+      <div style={{padding:'12px 12px 0',display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,background:'var(--bg-canvas)',borderBottom:'1px solid var(--border-1)'}}>
+        {[['Open',14,'var(--status-error)'],['Escalated',3,'var(--status-warn)'],['Resolved today',82,'var(--status-ok)'],['Avg resolve',' 6m 42s','var(--fg-1)'],['SLA breach',0,'var(--fg-1)']].map(([l,v,c])=>(
+          <div key={l} style={{padding:'10px 0'}}>
+            <div className="label">{l}</div>
+            <div className="mono" style={{fontSize:22,fontWeight:500,marginTop:2,color:c}}>{v}</div>
+          </div>
+        ))}
+      </div>
+      <div className="content" style={{flexDirection:'column'}}>
+        <div style={{flex:'1 1 55%',minHeight:0,display:'flex'}}>
+          <ExceptionQueue/>
+        </div>
+        <div className="splitter-h"/>
+        <div style={{flex:'1 1 45%',minHeight:0,display:'flex'}}>
+          <TradeCapture/>
+        </div>
+      </div>
+      <StatusBar items={['queue: MO-RATES-EMEA','SLA p95 8m']} />
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

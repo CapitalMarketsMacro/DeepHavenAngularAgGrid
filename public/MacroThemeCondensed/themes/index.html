@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Macro Themes · AG Grid · PrimeNG · PrimeReact</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+  html,body { margin:0; background:var(--bg-app); color:var(--fg-1); font-family:var(--font-sans); min-height:100vh; }
+  .wrap { max-width:980px; margin:0 auto; padding:42px 32px 60px; }
+  header { display:flex; align-items:center; gap:14px; padding-bottom:28px; border-bottom:1px solid var(--border-1); margin-bottom:28px }
+  header img { width:32px; height:32px }
+  h1 { font-size:20px; font-weight:600; letter-spacing:-0.01em; margin:0; }
+  h1 small { color:var(--fg-3); font-weight:500; margin-left:10px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+  p.lede { color:var(--fg-2); font-size:13px; max-width:64ch; line-height:1.55; }
+  h2 { font-size:10px; color:var(--fg-3); letter-spacing:.08em; text-transform:uppercase; margin:36px 0 14px; font-weight:500 }
+  .cards { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  .card { background:var(--bg-panel); border:1px solid var(--border-1); border-radius:var(--r-md); padding:16px; text-decoration:none; color:var(--fg-1); display:block; transition:border-color 100ms linear, background 100ms linear }
+  .card:hover { border-color:var(--cerulean-500); background:var(--bg-raised); color:var(--fg-1); }
+  .card .mark { width:28px;height:28px;background:var(--bg-raised);border:1px solid var(--border-2);border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:600;font-size:13px;color:var(--cerulean-400); margin-bottom:14px }
+  .card h3 { font-size:13px; font-weight:600; margin:0 0 2px; }
+  .card .v { font-size:10px; color:var(--fg-3); letter-spacing:.08em; text-transform:uppercase; }
+  .card p { font-size:12px; color:var(--fg-2); line-height:1.5; margin:10px 0 0; }
+  .card .files { margin-top:12px; font-family:var(--font-mono); font-size:11px; color:var(--fg-3); line-height:1.6 }
+  .card .files span { color:var(--cerulean-300) }
+  pre { background:var(--bg-canvas); border:1px solid var(--border-1); border-radius:var(--r-sm); padding:12px 14px; font-family:var(--font-mono); font-size:11px; line-height:1.55; color:var(--fg-1); overflow-x:auto; }
+  pre .k { color:var(--cerulean-300) }
+  pre .s { color:#a8d8a0 }
+  pre .c { color:var(--fg-3) }
+  .rules { background:var(--bg-panel); border:1px solid var(--border-1); border-radius:var(--r-md); padding:16px 20px; font-size:12px; color:var(--fg-2); line-height:1.7; }
+  .rules ul { margin:0; padding-left:20px }
+  .rules li { margin:2px 0 }
+  .rules b { color:var(--fg-1); font-weight:500; }
+  .rules code { font-family:var(--font-mono); color:var(--cerulean-300); background:var(--bg-raised); padding:1px 5px; border-radius:3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <img src="../assets/logo-mark.svg" alt="">
+  <div>
+    <h1>Macro Themes <small>FRAMEWORK BRIDGES</small></h1>
+    <p class="lede" style="margin:6px 0 0">Drop-in Macro styling for the three libraries every bank front-office ends up using: AG Grid for blotters, PrimeNG for Angular apps, PrimeReact for React apps. Cerulean brand, dark-default surfaces, mono numbers, tick-flash animations, density toggle, OpenFin hooks — baked in.</p>
+  </div>
+</header>
+
+<h2>Live Storybooks</h2>
+<div class="cards">
+  <a class="card" href="ag-grid/preview.html">
+    <div class="mark">AG</div>
+    <h3>AG Grid</h3>
+    <div class="v">v33+ · Theming API</div>
+    <p>Live-ticking rates blotter. Pinned columns, directional colors, tick-flash, density toggle.</p>
+    <div class="files">ag-grid/<br><span>macro-theme.js</span> · macro-overrides.css<br>preview.html</div>
+  </a>
+  <a class="card" href="primeng/preview.html">
+    <div class="mark">NG</div>
+    <h3>PrimeNG</h3>
+    <div class="v">v17+ · Aura base</div>
+    <p>Token contract check against Prime's DOM classes — drop the CSS into your Angular app's styles array.</p>
+    <div class="files">primeng/<br><span>macro-theme.css</span><br>preview.html</div>
+  </a>
+  <a class="card" href="primereact/preview.html">
+    <div class="mark">RX</div>
+    <h3>PrimeReact</h3>
+    <div class="v">v10+ · Aura base</div>
+    <p>Live React components — Buttons, DataTable, Dialog, Sidebar, Tree, Messages — under Macro tokens.</p>
+    <div class="files">primereact/<br><span>macro-theme.css</span><br>preview.html</div>
+  </a>
+</div>
+
+<h2>Install — AG Grid v33</h2>
+<pre><span class="c">// ESM</span>
+<span class="k">import</span> { AgGridReact } <span class="k">from</span> <span class="s">'ag-grid-react'</span>;
+<span class="k">import</span> <span class="s">'./themes/ag-grid/macro-overrides.css'</span>;     <span class="c">// tick-flash + density</span>
+<span class="k">import</span> { macroTheme } <span class="k">from</span> <span class="s">'./themes/ag-grid/macro-theme.js'</span>;
+
+&lt;<span class="k">AgGridReact</span>
+  theme={macroTheme}
+  rowData={rows}
+  columnDefs={[
+    { field: <span class="s">'bid'</span>, cellClass: <span class="s">'mkt-num mkt-up'</span> },
+    { field: <span class="s">'ask'</span>, cellClass: <span class="s">'mkt-num mkt-down'</span> },
+  ]}
+  enableCellChangeFlash /&gt;</pre>
+
+<h2>Install — PrimeNG</h2>
+<pre><span class="c">// angular.json → projects.&lt;app&gt;.architect.build.options.styles</span>
+[
+  <span class="s">"node_modules/primeng/resources/themes/aura-dark-blue/theme.css"</span>,
+  <span class="s">"node_modules/primeicons/primeicons.css"</span>,
+  <span class="s">"src/styles/macro-theme.css"</span>                  <span class="c">// copied from themes/primeng/</span>
+]</pre>
+
+<h2>Install — PrimeReact</h2>
+<pre><span class="k">import</span> <span class="s">'primereact/resources/themes/aura-dark-blue/theme.css'</span>;
+<span class="k">import</span> <span class="s">'primeicons/primeicons.css'</span>;
+<span class="k">import</span> <span class="s">'./themes/primereact/macro-theme.css'</span>;                <span class="c">// AFTER Aura</span>
+
+<span class="c">// anywhere you render components:</span>
+&lt;<span class="k">DataTable</span> value={rows} size=<span class="s">"small"</span> scrollable&gt;
+  &lt;<span class="k">Column</span> field=<span class="s">"bid"</span> body={r =&gt; &lt;span className=<span class="s">"mkt-num mkt-up"</span>&gt;{r.bid}&lt;/span&gt;} /&gt;
+  &lt;<span class="k">Column</span> field=<span class="s">"ask"</span> body={r =&gt; &lt;span className=<span class="s">"mkt-num mkt-down"</span>&gt;{r.ask}&lt;/span&gt;} /&gt;
+&lt;/<span class="k">DataTable</span>&gt;</pre>
+
+<h2>The non-negotiables</h2>
+<div class="rules">
+<ul>
+  <li><b>Directional colors are sacred.</b> <code>.mkt-up</code> / <code>.mkt-down</code> = green/red only for bid/ask, price change, P&amp;L. Never for success toasts or error pills.</li>
+  <li><b>Non-directional status</b> lives on Prime's <code>p-tag-*</code> / <code>p-message-*</code> severities (info blue, warn yellow, error red-on-red, success green) — we retint these to Macro but keep the semantics.</li>
+  <li><b>Brand is cerulean.</b> CTAs, focus rings, active tabs, live-price dot. Never in data.</li>
+  <li><b>Numbers are mono + tabular.</b> Every cell that shows price, size, rate, or count gets <code>.mkt-num</code> (right-aligned, tabular-nums).</li>
+  <li><b>Density is a data attribute.</b> <code>data-density="tight|cozy"</code> on any scope — body, panel, or the grid wrapper. Default (none) = dense trading-desk defaults.</li>
+  <li><b>Tick-flash is 600 ms linear.</b> <code>motion-flash</code> token, no bounces, no easing. Change the token if you must — don't rewrite per-component.</li>
+  <li><b>OpenFin hooks</b> activate with <code>&lt;html class="openfin"&gt;</code>: title bars become drag regions, Prime dialog headers drag, buttons and inputs stay clickable.</li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>

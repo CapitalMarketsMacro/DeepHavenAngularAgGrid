@@ -1,0 +1,41 @@
+/* Macro Design System — Web fonts
+ * Self-hosted font files (uploaded by user).
+ * - Roboto (variable): sans — replaces Inter
+ * - IBM Plex Mono: mono — replaces JetBrains Mono
+ */
+
+/* ============ Roboto (variable) ============ */
+@font-face {
+  font-family: "Roboto";
+  src: url("Roboto-VariableFont_wdth_wght.ttf") format("truetype-variations"),
+       url("Roboto-VariableFont_wdth_wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-stretch: 75% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("Roboto-Italic-VariableFont_wdth_wght.ttf") format("truetype-variations"),
+       url("Roboto-Italic-VariableFont_wdth_wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-stretch: 75% 125%;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ============ IBM Plex Mono ============ */
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-Thin.ttf")            format("truetype"); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-ThinItalic.ttf")      format("truetype"); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-ExtraLight.ttf")      format("truetype"); font-weight: 200; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-ExtraLightItalic.ttf")format("truetype"); font-weight: 200; font-style: italic; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-Light.ttf")           format("truetype"); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-LightItalic.ttf")     format("truetype"); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-Regular.ttf")         format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-Italic.ttf")          format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-Medium.ttf")          format("truetype"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-MediumItalic.ttf")    format("truetype"); font-weight: 500; font-style: italic; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-SemiBold.ttf")        format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-SemiBoldItalic.ttf")  format("truetype"); font-weight: 600; font-style: italic; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-Bold.ttf")            format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("IBMPlexMono-BoldItalic.ttf")      format("truetype"); font-weight: 700; font-style: italic; font-display: swap; }
