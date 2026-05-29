@@ -30,6 +30,8 @@ export class App implements OnInit, OnDestroy {
   private readonly deephavenService = inject(DeephavenService);
   private gridApi!: GridApi;
   private transactionSubscription?: Subscription;
+  private cachedColumnDefs: ColDef[] = [];
+  private cachedColumnSchemaKey = '';
 
   readonly isConnected = this.deephavenService.isConnected;
   readonly isLoading = this.deephavenService.isLoading;
@@ -53,7 +55,17 @@ export class App implements OnInit, OnDestroy {
     // Use column types from the service (works for both client-side and viewport modes)
     const columnTypes = this.deephavenService.columnTypes();
 
-    return data.columns.map(col => {
+    const schemaKey = data.columns
+      .map(col => `${col}:${columnTypes?.get(col) ?? ''}`)
+      .join('|');
+
+    // Keep the same array reference for row updates so user column sizing is preserved.
+    if (schemaKey === this.cachedColumnSchemaKey && this.cachedColumnDefs.length > 0) {
+      return this.cachedColumnDefs;
+    }
+
+    this.cachedColumnSchemaKey = schemaKey;
+    this.cachedColumnDefs = data.columns.map(col => {
       const def: ColDef = {
         field: col,
         headerName: col,
@@ -69,6 +81,8 @@ export class App implements OnInit, OnDestroy {
 
       return def;
     });
+
+    return this.cachedColumnDefs;
   });
 
   readonly rowData = computed(() => {
@@ -255,6 +269,8 @@ export class App implements OnInit, OnDestroy {
   onDisconnect(): void {
     this.deephavenService.disconnect();
     this.connectionInfo = null;
+    this.cachedColumnDefs = [];
+    this.cachedColumnSchemaKey = '';
   }
 
   setDensity(next: 'tiny' | 'dense' | 'cozy'): void {
